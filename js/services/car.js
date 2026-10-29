@@ -12,6 +12,7 @@
     vehicle: { speed: null, rpm: null, engine: null, outTemp: null, batteryVoltage: null, fuelPercent: null, sun: null, park: null },
     heat: { rulHeat: null, lobHeat: null, zadHeat: null, driverTemp: null, passengerTemp: null },
     seats: { frontLeft: null, frontRight: null, rearLeft: null, rearRight: null },
+    extra: {},
     updatedAt: 0,
     error: null,
     available: false
@@ -21,6 +22,7 @@
   var timer = null;
   var inFlight = false;
   var signature = '';
+  var watched = [];
 
   function number(value, min, max) {
     var result = utils.toNumber(value, null);
@@ -83,7 +85,7 @@
   }
 
   function currentSignature() {
-    return JSON.stringify([state.vehicle, state.heat, state.seats, state.error]);
+    return JSON.stringify([state.vehicle, state.heat, state.seats, state.extra, state.error]);
   }
 
   function emitIfChanged() {
@@ -93,10 +95,34 @@
     bus.emit('car:change', state);
   }
 
+  // Custom car-data slots name a getCarData key the snapshot does not carry;
+  // they ride along with the same poll.
+  function readExtra(keys) {
+    var result = {};
+    keys.forEach(function (name) {
+      var value = bridge.getCarData(name);
+      if (value !== null) result[name] = value;
+    });
+    return result;
+  }
+
+  function setWatched(names) {
+    var next = [];
+    (Array.isArray(names) ? names : []).forEach(function (name) {
+      if (typeof name === 'string' && name && next.indexOf(name) === -1 && next.length < 8) {
+        next.push(name);
+      }
+    });
+    if (next.join('\n') === watched.join('\n')) return;
+    watched = next;
+    if (demandCount > 0) setTimeout(refresh, 0);
+  }
+
   function refresh() {
     if (inFlight) return;
     inFlight = true;
     var data = bridge.getCarData('all');
+    var extra = readExtra(watched);
     inFlight = false;
     if (!data) {
       state.error = bridge.isNative() ? 'unavailable' : 'no_bridge';
@@ -104,6 +130,7 @@
       emitIfChanged();
       return;
     }
+    state.extra = extra;
     apply(data);
     emitIfChanged();
   }
@@ -147,10 +174,24 @@
     });
   }
 
+  // Fire-and-forget host actions (rear seat levels, driver memory presets).
+  // A quick re-read lets the car snapshot catch up without waiting a poll.
+  function runEnum(name) {
+    var result = bridge.runEnum(String(name || ''));
+    var ok = !!result && result.ok !== false;
+    if (ok) setTimeout(refresh, 700);
+    return {
+      ok: ok,
+      error: ok ? null : (result && result.error ? String(result.error) : 'failed')
+    };
+  }
+
   App.services.car = {
     init: init,
     state: function () { return state; },
     demand: demand,
-    refresh: refresh
+    refresh: refresh,
+    setWatched: setWatched,
+    runEnum: runEnum
   };
 })(window.App);

@@ -230,18 +230,37 @@
       getRPM: car.rpm,
       engine: car.engine,
       engineState: car.engine,
+      getstatengin: car.engine,
       outTemp: car.outTemp,
+      out_temp: car.outTemp,
       getouttemp: car.outTemp,
       battery: car.batteryVoltage,
       batteryVoltage: car.batteryVoltage,
       akbvolt: car.batteryVoltage,
       fuel: car.fuelPercent,
       fuelPercent: car.fuelPercent,
+      fuel_percent: car.fuelPercent,
+      getFuelPercent: car.fuelPercent,
       sun: car.sun,
+      getsun: car.sun,
       park: car.park,
+      parkOnOff: car.park,
+      getParkOnOff: car.park,
       vod: 1,
+      getvod: 1,
       driverTemp: car.driverTemp,
-      passengerTemp: car.passengerTemp
+      driver_temp: car.driverTemp,
+      passengerTemp: car.passengerTemp,
+      passenger_temp: car.passengerTemp,
+      rulHeat: car.rulHeat,
+      steeringHeat: car.rulHeat,
+      getrulheat: car.rulHeat,
+      lobHeat: car.lobHeat,
+      windshieldHeat: car.lobHeat,
+      getlobheat: car.lobHeat,
+      zadHeat: car.zadHeat,
+      rearHeat: car.zadHeat,
+      getzadheat: car.zadHeat
     };
     if (Object.prototype.hasOwnProperty.call(single, name)) {
       return JSON.stringify({ name: name, value: single[name] });
@@ -357,6 +376,8 @@
     return fail(cmd, 'Unknown command');
   }
 
+  var REAR_SEAT = /^(heat|vent)_zad_seat_(l|r)_(off|[0-3])$/;
+
   function runEnum(name) {
     switch (name) {
       case 'MEDIA_PLAY':
@@ -384,8 +405,14 @@
       case 'heat_windshield_off': car.lobHeat = false; return JSON.stringify({ status: 'ok' });
       case 'heat_rearwindow_on': car.zadHeat = true; return JSON.stringify({ status: 'ok' });
       case 'heat_rearwindow_off': car.zadHeat = false; return JSON.stringify({ status: 'ok' });
-      default:
+      default: {
+        var rear = REAR_SEAT.exec(name);
+        if (rear) {
+          var target = rear[2] === 'l' ? car.seats.rearLeft : car.seats.rearRight;
+          target[rear[1]] = rear[3] === 'off' ? 0 : Number(rear[3]);
+        }
         return JSON.stringify({ status: 'ok' });
+      }
     }
   }
 

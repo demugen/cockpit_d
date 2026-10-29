@@ -37,6 +37,7 @@
     thermostat: [{ d: 'M10 13V5a2 2 0 114 0v8a4 4 0 11-4 0z' }],
     apps: [{ d: 'M4 4h6v6H4z' }, { d: 'M14 4h6v6h-6z' }, { d: 'M4 14h6v6H4z' }, { d: 'M14 14h6v6h-6z' }],
     car: [{ d: 'M5 15l1.6-5h10.8L19 15' }, { d: 'M4 15h17v3H4z' }, { d: 'M7 18v2' }, { d: 'M17 18v2' }],
+    user: [{ circle: [12, 8, 3.5] }, { d: 'M5 20a7 7 0 0114 0' }],
     refresh: [{ d: 'M20 12a8 8 0 10-2.3 5.7' }, { d: 'M20 5v5h-5' }],
     clock: [{ circle: [12, 12, 9] }, { d: 'M12 7v5l3 2' }],
     grip: [{ circle: [9, 7, 1] }, { circle: [15, 7, 1] }, { circle: [9, 12, 1] }, { circle: [15, 12, 1] }, { circle: [9, 17, 1] }, { circle: [15, 17, 1] }],

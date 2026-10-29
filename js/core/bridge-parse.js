@@ -30,6 +30,7 @@
   function objectError(data) {
     if (!data || typeof data !== 'object') return null;
     if (data.error) return String(data.error);
+    if (data.status === 'error') return 'failed';
     if (data.success === false) return 'failed';
     if (data.available === false) return 'unavailable';
     if (data.ok === false) return 'failed';

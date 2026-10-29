@@ -49,6 +49,10 @@ test('scripts load in dependency order', () => {
   };
   assert.equal(scripts[0], 'js/core/namespace.js');
   assert.equal(scripts[scripts.length - 1], 'js/main.js');
+  assert.ok(at('js/core/slots.js') > at('js/core/utils.js'));
+  assert.ok(at('js/core/tiles.js') > at('js/core/utils.js'));
+  assert.ok(at('js/core/seat-catalog.js') > at('js/core/utils.js'));
+  assert.ok(at('js/core/car-metrics.js') > at('js/core/utils.js'));
   assert.ok(at('js/core/settings-schema.js') > at('js/core/grid.js'));
   assert.ok(at('js/core/bridge.js') > at('js/core/bridge-parse.js'));
   assert.ok(at('js/services/settings.js') > at('js/core/bridge.js'));

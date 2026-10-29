@@ -8,6 +8,8 @@ test('payloadError distinguishes rejection, errors and valid payloads', () => {
   assert.equal(parse.payloadError(false), 'rejected');
   assert.equal(parse.payloadError('{"error":"unauthorized"}'), 'unauthorized');
   assert.equal(parse.payloadError('{"success":false}'), 'failed');
+  assert.equal(parse.payloadError('{"status":"error"}'), 'failed');
+  assert.equal(parse.payloadError('{"status":"ok"}'), null);
   assert.equal(parse.payloadError({ available: false }), 'unavailable');
   assert.equal(parse.payloadError({ ok: false }), 'failed');
   assert.equal(parse.payloadError('{"name":"speed","value":42}'), null);

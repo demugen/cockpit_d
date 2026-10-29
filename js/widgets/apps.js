@@ -16,8 +16,10 @@
       var dom = App.ui.dom;
       var service = ctx.services.apps;
       var node = ctx.root;
+      var slots = App.core.slots;
+      var tiles = App.core.tiles;
 
-      var AUTO_MAX = 8;
+      var AUTO_MAX = slots.MAX;
 
       node.classList.add('w-apps');
       ctx.demand('apps', true);
@@ -33,15 +35,11 @@
       }
 
       function slotPackages() {
-        var value = ctx.settings && ctx.settings.slots;
-        if (!Array.isArray(value)) return [];
-        return value.filter(function (pkg) {
-          return typeof pkg === 'string' && pkg;
-        }).slice(0, AUTO_MAX);
+        return slots.list(ctx.settings && ctx.settings.slots, AUTO_MAX);
       }
 
       function customSlots() {
-        return slotPackages().length > 0;
+        return slots.has(ctx.settings && ctx.settings.slots, AUTO_MAX);
       }
 
       function slotApps() {
@@ -60,24 +58,12 @@
         return chosenCount() + '|' + slotPackages().join(',');
       }
 
-      // Pick the tile matrix with the largest glyph: a short row of wide tiles
-      // beats a single squeezed row, and one spare cell is tolerated for 6.
       function gridFor(count, w, h) {
-        var best = { cols: count, rows: 1, score: -1 };
-        var maxRows = Math.min(count, 4);
-        for (var rows = 1; rows <= maxRows; rows += 1) {
-          var cols = Math.ceil(count / rows);
-          var slots = cols * rows;
-          if (slots - count > 1 && rows > 1) continue;
-          var glyph = Math.min(w / cols, (h / rows) * 0.72);
-          var score = glyph * Math.pow(count / slots, 0.35) * (1 + cols * 0.01);
-          if (score > best.score) best = { cols: cols, rows: rows, score: score };
-        }
-        return best;
+        return tiles.bestMatrix(count, w, h, 0.72);
       }
 
       function capacityFor(size) {
-        return Math.max(2, Math.min(AUTO_MAX, size.w * size.h * 2));
+        return Math.max(2, tiles.capacity(size, AUTO_MAX, 2));
       }
 
       var lastKey = settingsKey();

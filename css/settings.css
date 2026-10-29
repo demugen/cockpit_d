@@ -1,5 +1,5 @@
-/* Settings modal. A single scrollable panel with three sections: view,
-   widgets and about. Rows keep the switch on the right at every width. */
+/* Settings modal: a fixed tab bar and one scrollable panel below it. Rows
+   keep the switch on the right at every width. */
 
 body.modal-open {
   overflow: hidden;
@@ -52,6 +52,50 @@ body.modal-open {
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.settings-tabs {
+  display: flex;
+  flex: none;
+  gap: clamp(2px, 0.5vmin, 6px);
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-tab {
+  position: relative;
+  flex: none;
+  margin-bottom: -1px;
+  padding: 12px 10px 11px;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-tab:hover {
+  color: var(--text);
+}
+
+.settings-tab.is-current {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+  border-radius: 6px;
 }
 
 .modal-body {
@@ -159,11 +203,106 @@ body.modal-open {
   flex: none;
 }
 
-.slot-control {
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 0 14px;
+}
+
+.slot-tile-wrap {
+  position: relative;
+}
+
+.slot-tile {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.slot-tile:hover {
+  border-color: var(--line-strong);
+  background: var(--control-hover);
+}
+
+.slot-tile--empty {
+  gap: 5px;
+  justify-content: center;
+  border-style: dashed;
+  background: transparent;
+  color: var(--faint);
+}
+
+.slot-tile--empty:hover {
+  color: var(--muted);
+}
+
+.slot-tile-plus {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.slot-tile-index {
+  font-size: 12px;
+}
+
+.slot-tile-icon {
+  display: grid;
+  place-items: center;
   flex: none;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.slot-tile-icon img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.slot-tile-name {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.slot-tile-clear {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card-solid);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.slot-tile-clear:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .btn-sm {
@@ -364,6 +503,10 @@ body.modal-open {
   .modal-body {
     padding: 2px 16px 20px;
   }
+
+  .slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ---------- app slot picker ---------- */
@@ -427,6 +570,35 @@ body.modal-open {
   display: block;
 }
 
+.brand-mask {
+  display: block;
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.brand-mask--seat-heat-left {
+  -webkit-mask-image: url('../assets/icons/seat-heat-left.svg');
+  mask-image: url('../assets/icons/seat-heat-left.svg');
+}
+
+.brand-mask--seat-heat-right {
+  -webkit-mask-image: url('../assets/icons/seat-heat-right.svg');
+  mask-image: url('../assets/icons/seat-heat-right.svg');
+}
+
+.brand-mask--seat-vent-left {
+  -webkit-mask-image: url('../assets/icons/seat-vent-left.svg');
+  mask-image: url('../assets/icons/seat-vent-left.svg');
+}
+
+.brand-mask--seat-vent-right {
+  -webkit-mask-image: url('../assets/icons/seat-vent-right.svg');
+  mask-image: url('../assets/icons/seat-vent-right.svg');
+}
+
 .picker-text {
   min-width: 0;
 }
@@ -454,4 +626,47 @@ body.modal-open {
   text-align: center;
   color: var(--muted);
   font-size: 14px;
+}
+
+.picker-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 12px 10px 4px;
+  border-top: 1px solid var(--line);
+}
+
+.picker-search-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.picker-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.picker-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.picker-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.picker-status {
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--muted);
 }
