@@ -1,0 +1,9 @@
+{
+  "name": "cockpit-d",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Cockpit D — cell-pinned launcher for JCarTools head units",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -1,0 +1,1799 @@
+/* Widget internals. Sizes come from --cw / --ch (the measured card box), so
+   the same card reads well at 2x1, 2x2 and 4x2 without container queries. */
+
+/* ---------- clock ---------- */
+
+.w-clock {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--ch) * 0.02);
+  min-width: 0;
+}
+
+.clock-time {
+  font-size: clamp(28px, calc(min(calc(var(--ch) * 0.34), calc(var(--cw) * 0.3)) * var(--font-scale)), 120px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* A 1x1 clock keeps the time and drops the date; the time is capped by the
+   card width so it cannot bleed out of a one-column tile. */
+.w-clock[data-w="1"] .clock-date {
+  display: none;
+}
+
+/* "00:00:00" is two characters wider than "00:00": a 1x1 tile with seconds
+   needs a smaller face to keep all eight digits inside the card. */
+.w-clock[data-w="1"].is-seconds .clock-time {
+  font-size: clamp(18px, calc(var(--cw) * 0.2), 64px);
+}
+
+.clock-date {
+  font-size: clamp(11px, calc(var(--ch) * 0.13 * var(--font-scale)), 36px);
+  color: var(--muted);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- weather ---------- */
+
+.w-weather {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: calc(var(--ch) * 0.03);
+  cursor: pointer;
+}
+
+.weather-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.weather-city {
+  font-size: clamp(11px, calc(var(--ch) * 0.1 * var(--font-scale)), 28px);
+  font-weight: 500;
+  letter-spacing: 0.015em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weather-refresh {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: clamp(26px, calc(var(--ch) * 0.16), 40px);
+  height: clamp(26px, calc(var(--ch) * 0.16), 40px);
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--muted);
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.weather-refresh .icon {
+  width: 52%;
+  height: 52%;
+}
+
+.weather-refresh:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+
+.weather-refresh.is-busy .icon {
+  animation: spin 1s linear infinite;
+}
+
+.weather-body {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--ch) * 0.07);
+  min-width: 0;
+  min-height: 0;
+}
+
+.weather-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(var(--ch) * 0.32);
+  color: var(--accent);
+}
+
+.weather-glyph,
+.weather-image {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.weather-image {
+  object-fit: contain;
+}
+
+.weather-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  min-width: 0;
+}
+
+.weather-temp {
+  font-size: clamp(22px, calc(var(--ch) * 0.32 * var(--font-scale)), 110px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.weather-cond {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: clamp(11px, calc(var(--ch) * 0.11 * var(--font-scale)), 30px);
+  color: var(--muted);
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+/* ---------- media ---------- */
+
+.w-media {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "art info controls"
+    "volume volume volume";
+  align-items: center;
+  gap: calc(var(--ch) * 0.02) calc(var(--cw) * 0.02);
+  min-width: 0;
+  min-height: 0;
+}
+
+.w-media:not([data-h="1"]) {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "art info"
+    "art controls"
+    "volume volume";
+  align-items: stretch;
+}
+
+.media-art {
+  grid-area: art;
+  position: relative;
+  align-self: center;
+  height: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  overflow: hidden;
+}
+
+.w-media:not([data-h="1"]) .media-art {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  align-self: center;
+}
+
+/* 2x1 is the smallest portrait media card: one compact row with a small
+   cover, the title, a single play button and the volume strip below. */
+.w-media[data-w="2"][data-h="1"] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "art info controls"
+    "volume volume volume";
+}
+
+.w-media[data-w="2"][data-h="1"] .media-art {
+  width: auto;
+  height: min(100%, 92px);
+  aspect-ratio: 1;
+  align-self: center;
+}
+
+.w-media[data-w="2"][data-h="1"] .media-next,
+.w-media[data-w="2"][data-h="1"] .media-meta,
+.w-media[data-w="2"][data-h="1"] .media-times {
+  display: none;
+}
+
+.media-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--faint);
+}
+
+.media-placeholder .icon {
+  width: clamp(22px, calc(var(--ch) * 0.18), 74px);
+  height: auto;
+}
+
+.media-info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--ch) * 0.012);
+  min-width: 0;
+  min-height: 0;
+}
+
+.media-title {
+  font-size: clamp(14px, calc(min(calc(var(--ch) * 0.12), calc(var(--cw) * 0.068)) * var(--font-scale)), 46px);
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-artist {
+  font-size: clamp(11px, calc(min(calc(var(--ch) * 0.085), calc(var(--cw) * 0.05)) * var(--font-scale)), 38px);
+  color: var(--muted);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-meta {
+  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038)) * var(--font-scale)), 28px);
+  color: var(--faint);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-progress {
+  height: clamp(8px, calc(var(--ch) * 0.055), 18px);
+  margin-top: calc(var(--ch) * 0.012);
+  border-radius: 999px;
+  background: var(--control-hover);
+  overflow: hidden;
+}
+
+.media-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.media-times {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038)) * var(--font-scale)), 28px);
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wide cards keep transport in a column at the right edge: it lives in the
+   free area between the artwork, the progress line and the volume strip. */
+.media-controls {
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, calc(var(--ch) * 0.02), 12px);
+  min-width: 0;
+}
+
+/* Portrait stacks the info above the transport, so the buttons sit in a row
+   under the progress line. */
+.w-media:not([data-h="1"]) .media-controls {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(6px, calc(var(--ch) * 0.03), 16px);
+}
+
+.media-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: clamp(40px, calc(var(--ch) * 0.22), 72px);
+  height: clamp(40px, calc(var(--ch) * 0.22), 72px);
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--text);
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.media-btn .icon {
+  width: 46%;
+  height: 46%;
+}
+
+.media-btn:hover {
+  background: var(--control-hover);
+}
+
+.media-play {
+  width: clamp(46px, calc(var(--ch) * 0.26), 84px);
+  height: clamp(46px, calc(var(--ch) * 0.26), 84px);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 6px 16px rgba(63, 157, 255, 0.28);
+}
+
+.media-play:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* Volume is a strip under the whole card, not a control squeezed between
+   the buttons: the fill runs the full widget width. */
+.media-volume {
+  grid-area: volume;
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, calc(var(--cw) * 0.012), 12px);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.media-volume-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--muted);
+}
+
+.media-volume-icon .icon {
+  width: clamp(15px, calc(var(--ch) * 0.08), 24px);
+  height: auto;
+}
+
+/* Two classes so these win over the generic .range-input defaults
+   that come later in this file. */
+.media-volume .media-slider {
+  --range-track: clamp(8px, calc(var(--ch) * 0.045), 14px);
+  --range-thumb: clamp(18px, calc(var(--ch) * 0.105), 30px);
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.media-volume .media-slider::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(90deg, var(--accent), var(--accent-bright)) 0 0 / var(--fill, 50%) 100% no-repeat,
+    var(--control-hover);
+}
+
+.media-vol-value {
+  flex: none;
+  min-width: 3ch;
+  text-align: right;
+  font-size: clamp(10px, calc(var(--ch) * 0.065 * var(--font-scale)), 22px);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.w-media[data-w="3"] .media-meta {
+  display: none;
+}
+
+/* Below 1000px a 4x1 landscape card is only ~400px wide; the single-row
+   layout squeezes the title to nothing, so transport moves under the text. */
+@media (max-width: 1000px) {
+  .w-media[data-h="1"] {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "art info"
+      "controls controls"
+      "volume volume";
+    align-items: stretch;
+  }
+
+  .w-media[data-h="1"] .media-art {
+    height: 100%;
+    width: auto;
+    aspect-ratio: 1;
+    align-self: center;
+  }
+
+  .w-media[data-h="1"] .media-controls {
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .w-media[data-h="1"] .media-meta {
+    display: none;
+  }
+}
+
+/* ---------- range sliders ---------- */
+
+.range-input {
+  --range-track: clamp(5px, calc(var(--ch) * 0.03), 10px);
+  --range-thumb: clamp(17px, calc(var(--ch) * 0.095), 28px);
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  height: clamp(28px, calc(var(--ch) * 0.15), 44px);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.range-input::-webkit-slider-runnable-track {
+  height: var(--range-track);
+  border-radius: 999px;
+  background: linear-gradient(to right,
+    var(--accent) 0 var(--fill, 50%),
+    var(--control-hover) var(--fill, 50%) 100%);
+}
+
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--range-thumb);
+  height: var(--range-thumb);
+  margin-top: calc((var(--range-track) - var(--range-thumb)) / 2);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.range-input:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.range-input:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- climate ---------- */
+
+.w-climate {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ch) * 0.028);
+  min-height: 0;
+}
+
+.cl-head {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ch) * 0.022);
+  flex: 1;
+  min-height: 0;
+}
+
+.cl-zone,
+.cl-fan {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, calc(var(--cw) * 0.015), 16px);
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0 clamp(8px, calc(var(--cw) * 0.02), 22px);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+}
+
+.cl-label {
+  flex: none;
+  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+.cl-zone-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, calc(var(--cw) * 0.008), 10px);
+  margin-left: auto;
+  min-width: 0;
+}
+
+.cl-step {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: clamp(28px, calc(var(--ch) * 0.1), 46px);
+  height: clamp(28px, calc(var(--ch) * 0.1), 46px);
+  border-radius: 50%;
+  background: var(--control-hover);
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.cl-step:hover {
+  background: var(--line-strong);
+}
+
+.cl-step .icon {
+  width: 56%;
+  height: 56%;
+}
+
+.cl-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: clamp(20px, calc(var(--ch) * 0.14 * var(--font-scale)), 82px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.cl-fan-value .icon {
+  width: clamp(16px, calc(var(--ch) * 0.09), 32px);
+  height: auto;
+  color: var(--muted);
+}
+
+.cl-toggles {
+  display: flex;
+  gap: clamp(6px, calc(var(--cw) * 0.018), 14px);
+  flex: none;
+}
+
+.cl-toggle {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-width: 0;
+  height: clamp(38px, calc(var(--ch) * 0.15), 78px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.cl-toggle .icon {
+  width: 42%;
+  height: 42%;
+  max-width: 26px;
+  max-height: 26px;
+}
+
+.cl-toggle-text {
+  font-size: clamp(9px, calc(var(--ch) * 0.065 * var(--font-scale)), 20px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.cl-toggle:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+
+.cl-toggle.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.cl-toggle.is-pending {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.cl-note {
+  flex: none;
+  text-align: center;
+  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
+  color: var(--danger);
+}
+
+.w-climate.is-unavailable .cl-head,
+.w-climate.is-unavailable .cl-toggles {
+  opacity: 0.45;
+}
+
+/* Wide climate cards put the two zones side by side and give the fan and the
+   toggles the full width. */
+.w-climate[data-w="3"] .cl-head,
+.w-climate[data-w="4"] .cl-head,
+.w-climate[data-w="5"] .cl-head,
+.w-climate[data-w="6"] .cl-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.w-climate[data-w="3"] .cl-fan,
+.w-climate[data-w="4"] .cl-fan,
+.w-climate[data-w="5"] .cl-fan,
+.w-climate[data-w="6"] .cl-fan {
+  grid-column: 1 / -1;
+}
+
+/* Each side of a wide card is only about one and a half cells wide, so the
+   zone name sits above the - value + row instead of eating its width. */
+.w-climate[data-w="3"] .cl-zone,
+.w-climate[data-w="4"] .cl-zone,
+.w-climate[data-w="5"] .cl-zone,
+.w-climate[data-w="6"] .cl-zone {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(2px, calc(var(--ch) * 0.01), 6px);
+}
+
+.w-climate[data-w="3"] .cl-zone .cl-label,
+.w-climate[data-w="4"] .cl-zone .cl-label,
+.w-climate[data-w="5"] .cl-zone .cl-label,
+.w-climate[data-w="6"] .cl-zone .cl-label {
+  max-width: 100%;
+}
+
+.w-climate[data-w="3"] .cl-zone .cl-zone-row,
+.w-climate[data-w="4"] .cl-zone .cl-zone-row,
+.w-climate[data-w="5"] .cl-zone .cl-zone-row,
+.w-climate[data-w="6"] .cl-zone .cl-zone-row {
+  margin-left: 0;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.w-climate[data-w="3"] .cl-value,
+.w-climate[data-w="4"] .cl-value,
+.w-climate[data-w="5"] .cl-value,
+.w-climate[data-w="6"] .cl-value {
+  flex: 1;
+}
+
+/* ---------- seats ---------- */
+
+.w-seats {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ch) * 0.025);
+  min-height: 0;
+}
+
+.seats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(5px, calc(var(--cw) * 0.018), 12px);
+  flex: 1;
+  min-height: 0;
+}
+
+.seat-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(4px, calc(var(--ch) * 0.02), 10px);
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(6px, calc(var(--cw) * 0.02), 14px);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+}
+
+.seat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text);
+}
+
+.seat-name {
+  font-size: clamp(10px, calc(var(--cw) * 0.038 * var(--font-scale)), 18px);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(3px, calc(var(--ch) * 0.014), 8px);
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(4px, calc(var(--ch) * 0.018), 10px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--text);
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.seat-btn:hover:not(:disabled) {
+  background: var(--control-hover);
+  border-color: var(--line-strong);
+}
+
+.seat-btn:disabled {
+  opacity: 0.45;
+}
+
+.seat-btn-icon {
+  flex: none;
+  width: clamp(20px, calc(var(--ch) * 0.1), 40px);
+  aspect-ratio: 1;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.seat-btn-icon--heat.seat-btn-icon--left {
+  -webkit-mask-image: url('../assets/icons/seat-heat-left.svg');
+  mask-image: url('../assets/icons/seat-heat-left.svg');
+}
+
+.seat-btn-icon--heat.seat-btn-icon--right {
+  -webkit-mask-image: url('../assets/icons/seat-heat-right.svg');
+  mask-image: url('../assets/icons/seat-heat-right.svg');
+}
+
+.seat-btn-icon--vent.seat-btn-icon--left {
+  -webkit-mask-image: url('../assets/icons/seat-vent-left.svg');
+  mask-image: url('../assets/icons/seat-vent-left.svg');
+}
+
+.seat-btn-icon--vent.seat-btn-icon--right {
+  -webkit-mask-image: url('../assets/icons/seat-vent-right.svg');
+  mask-image: url('../assets/icons/seat-vent-right.svg');
+}
+
+.seat-btn--heat[aria-pressed="true"] .seat-btn-icon {
+  color: var(--warn);
+}
+
+.seat-btn--vent[aria-pressed="true"] .seat-btn-icon {
+  color: var(--accent);
+}
+
+.seat-btn-label {
+  max-width: 100%;
+  min-width: 0;
+  font-size: clamp(10px, calc(var(--ch) * 0.04 * var(--font-scale)), 15px);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat-btn-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(2px, calc(var(--cw) * 0.006), 4px);
+  flex: none;
+  width: clamp(38px, calc(var(--ch) * 0.18), 72px);
+  height: clamp(6px, calc(var(--ch) * 0.024), 11px);
+}
+
+.seat-btn-levels i {
+  border-radius: 999px;
+  background: var(--faint);
+  opacity: 0.55;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.seat-btn-levels i.is-on {
+  opacity: 1;
+}
+
+.seat-btn--heat .seat-btn-levels i.is-on {
+  background: var(--warn);
+}
+
+.seat-btn--vent .seat-btn-levels i.is-on {
+  background: var(--accent);
+}
+
+.seat-btn.is-pending {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* One row of cells is too short for a tile: keep icon, name and meter inline. */
+.w-seats[data-h="1"] .seat-btn {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: clamp(4px, calc(var(--cw) * 0.014), 6px);
+  padding: 0 clamp(5px, calc(var(--cw) * 0.02), 8px);
+  text-align: left;
+}
+
+.w-seats[data-h="1"] .seat-btn-icon {
+  width: clamp(14px, calc(var(--ch) * 0.13), 22px);
+}
+
+.w-seats[data-h="1"] .seat-btn-label {
+  flex: 1;
+  font-size: clamp(9px, calc(var(--cw) * 0.03 * var(--font-scale)), 13px);
+}
+
+.w-seats[data-h="1"] .seat-btn-levels {
+  width: clamp(26px, calc(var(--cw) * 0.09), 38px);
+  height: clamp(5px, calc(var(--ch) * 0.028), 8px);
+}
+
+.seat-note {
+  flex: none;
+  text-align: center;
+  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
+  color: var(--danger);
+}
+
+.w-seats.is-unavailable .seats-grid {
+  opacity: 0.45;
+}
+
+/* ---------- heaters ---------- */
+
+.w-heaters {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ch) * 0.025);
+  min-height: 0;
+}
+
+/* Same mechanics as the seats: one compact row button per function. Glass
+   and steering heat only know on/off, so the row ends with a single state
+   pill instead of a three-step meter. */
+.heat-grid {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(5px, calc(var(--ch) * 0.028), 12px);
+  flex: 1;
+  min-height: 0;
+}
+
+.heat-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(8px, calc(var(--cw) * 0.024), 16px);
+  flex: 0 1 auto;
+  height: clamp(38px, calc(var(--ch) * 0.29), 68px);
+  min-width: 0;
+  min-height: 0;
+  padding: 0 clamp(10px, calc(var(--cw) * 0.03), 18px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--text);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.heat-btn:hover:not(:disabled) {
+  background: var(--control-hover);
+  border-color: var(--line-strong);
+}
+
+.heat-btn:disabled {
+  opacity: 0.45;
+}
+
+.heat-btn-icon {
+  flex: none;
+  width: clamp(18px, calc(var(--ch) * 0.14), 30px);
+  aspect-ratio: 1;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.heat-btn-icon--glass {
+  -webkit-mask-image: url('../assets/icons/glass-heat.svg');
+  mask-image: url('../assets/icons/glass-heat.svg');
+}
+
+.heat-btn-icon--rear {
+  -webkit-mask-image: url('../assets/icons/rear-window.svg');
+  mask-image: url('../assets/icons/rear-window.svg');
+}
+
+.heat-btn-icon--wheel {
+  -webkit-mask-image: url('../assets/icons/steering-wheel-heat.svg');
+  mask-image: url('../assets/icons/steering-wheel-heat.svg');
+}
+
+.heat-btn[aria-pressed="true"] {
+  background: var(--control-hover);
+  border-color: var(--line-strong);
+}
+
+.heat-btn[aria-pressed="true"] .heat-btn-icon {
+  color: var(--warn);
+}
+
+.heat-btn-label {
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  font-size: clamp(11px, calc(var(--ch) * 0.07 * var(--font-scale)), 20px);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heat-btn-meter {
+  flex: none;
+  width: clamp(26px, calc(var(--cw) * 0.09), 38px);
+  height: clamp(5px, calc(var(--ch) * 0.028), 8px);
+  border-radius: 999px;
+  background: var(--faint);
+  opacity: 0.55;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.heat-btn[aria-pressed="true"] .heat-btn-meter {
+  background: var(--warn);
+  opacity: 1;
+}
+
+.heat-btn.is-pending {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.heat-note {
+  flex: none;
+  text-align: center;
+  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
+  color: var(--danger);
+}
+
+.w-heaters.is-unavailable .heat-grid {
+  opacity: 0.45;
+}
+
+/* ---------- windows ---------- */
+
+.w-windows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(5px, calc(var(--ch) * 0.022), 12px);
+  min-height: 0;
+}
+
+.win-group {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, calc(var(--ch) * 0.014), 8px);
+  flex: 1;
+  min-height: 0;
+}
+
+.win-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.win-title {
+  flex: none;
+  font-size: clamp(9px, calc(var(--ch) * 0.045 * var(--font-scale)), 15px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.win-hint {
+  min-width: 0;
+  font-size: clamp(9px, calc(var(--ch) * 0.04 * var(--font-scale)), 13px);
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(4px, calc(var(--cw) * 0.012), 10px);
+  flex: 1;
+  min-height: 0;
+}
+
+.win-slider-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, calc(var(--cw) * 0.012), 10px);
+  flex: 1;
+  min-height: 0;
+  padding: 0 clamp(2px, calc(var(--cw) * 0.006), 6px);
+}
+
+.win-slider-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--muted);
+}
+
+.win-slider-icon .icon {
+  width: clamp(16px, calc(var(--ch) * 0.09), 30px);
+  height: auto;
+}
+
+.win-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  --range-track: clamp(6px, calc(var(--ch) * 0.04), 14px);
+  --range-thumb: clamp(18px, calc(var(--ch) * 0.11), 32px);
+}
+
+.win-slider-value {
+  flex: none;
+  min-width: 5.5ch;
+  text-align: right;
+  font-size: clamp(9px, calc(var(--cw) * 0.028 * var(--font-scale)), 15px);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.win-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(3px, calc(var(--ch) * 0.014), 8px);
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(3px, calc(var(--ch) * 0.014), 8px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--text);
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.win-btn:hover {
+  background: var(--control-hover);
+  border-color: var(--line-strong);
+}
+
+.win-btn-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--muted);
+}
+
+.win-btn-icon .icon {
+  width: clamp(16px, calc(var(--ch) * 0.09), 30px);
+  height: auto;
+}
+
+.win-btn-label {
+  max-width: 100%;
+  min-width: 0;
+  font-size: clamp(9px, calc(var(--cw) * 0.028 * var(--font-scale)), 14px);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-btn.is-armed {
+  border-color: var(--warn);
+  background: var(--control-hover);
+  color: var(--warn);
+}
+
+.win-btn.is-armed .win-btn-icon {
+  color: var(--warn);
+}
+
+.win-status {
+  flex: none;
+  min-width: 0;
+  text-align: center;
+  font-size: clamp(9px, calc(var(--ch) * 0.055 * var(--font-scale)), 14px);
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-status.is-sent {
+  color: var(--muted);
+}
+
+.win-status.is-error {
+  color: var(--danger);
+}
+
+/* One row of cells: drop the captions and put icon and label side by side. */
+.w-windows[data-h="1"] .win-head,
+.w-windows[data-h="1"] .win-status {
+  display: none;
+}
+
+.w-windows[data-h="1"] .win-btn {
+  flex-direction: row;
+  gap: clamp(3px, calc(var(--cw) * 0.01), 6px);
+  padding: 0 clamp(3px, calc(var(--cw) * 0.012), 8px);
+}
+
+.w-windows[data-h="1"] .win-btn-icon .icon {
+  width: clamp(12px, calc(var(--ch) * 0.12), 18px);
+}
+
+.w-windows[data-h="1"] .win-btn-label {
+  font-size: clamp(8px, calc(var(--cw) * 0.024 * var(--font-scale)), 12px);
+}
+
+.w-windows[data-h="1"] .win-slider-icon {
+  display: none;
+}
+
+.w-windows[data-h="1"] .win-slider-value {
+  min-width: 0;
+  font-size: clamp(8px, calc(var(--cw) * 0.024 * var(--font-scale)), 12px);
+}
+
+/* ---------- apps ---------- */
+
+.w-apps {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--app-cols, 2), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--app-rows, 1), minmax(0, 1fr));
+  gap: clamp(4px, calc(var(--cw) * 0.012), 12px);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(2px, calc(var(--ch) * 0.012), 8px);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: background 0.15s ease;
+}
+
+.app-tile:hover {
+  background: var(--control);
+}
+
+/* The glyph is square, sized by the shorter side of its cell, and leaves
+   room below for the app name. */
+.app-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: min(100%, calc(var(--ch) / var(--app-rows, 1) * 0.6));
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 22%;
+  background: var(--control);
+  overflow: hidden;
+}
+
+.app-letter {
+  font-size: clamp(12px, calc(var(--ch) / var(--app-rows, 1) * 0.3), 40px);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.app-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.app-name {
+  max-width: 100%;
+  font-size: clamp(9px, calc(var(--ch) / var(--app-rows, 1) * 0.1 * var(--font-scale)), 16px);
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.apps-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--ch) * 0.05);
+  flex: 1;
+  text-align: center;
+}
+
+.apps-empty-text {
+  font-size: clamp(11px, calc(var(--cw) * 0.042 * var(--font-scale)), 20px);
+  color: var(--muted);
+}
+
+.apps-empty .btn {
+  min-height: 36px;
+  font-size: clamp(11px, calc(var(--cw) * 0.034), 14px);
+}
+
+/* ---------- car data ---------- */
+
+.w-cardata {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(4px, calc(var(--cw) * 0.018), 12px);
+  flex: 1;
+  min-height: 0;
+}
+
+.car-grid[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.car-grid[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.car-grid[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* A one-column card is what portrait/large produces; stack its tiles. */
+.w-cardata[data-w="1"] .car-grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: none;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.car-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(6px, calc(var(--ch) * 0.035), 22px) clamp(8px, calc(var(--cw) * 0.02), 20px);
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  overflow: hidden;
+}
+
+.car-tile-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, calc(var(--cw) * 0.01), 8px);
+  min-width: 0;
+  color: var(--muted);
+}
+
+.car-tile-head .icon {
+  width: clamp(12px, calc(var(--ch) * 0.085), 18px);
+  height: auto;
+}
+
+.car-label {
+  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.075), calc(var(--cw) * 0.04)) * var(--font-scale)), 22px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.car-value-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.car-value {
+  font-size: clamp(20px, calc(min(calc(var(--ch) * 0.19), calc(var(--cw) * 0.12)) * var(--font-scale)), 92px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.car-unit {
+  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.car-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.car-sub-value {
+  font-size: clamp(20px, calc(min(calc(var(--ch) * 0.19), calc(var(--cw) * 0.12)) * var(--font-scale)), 92px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--muted);
+}
+
+.car-sub-unit {
+  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.car-tile.is-warn .car-value {
+  color: var(--warn);
+}
+
+.car-tile.is-danger .car-value {
+  color: var(--danger);
+}
+
+.car-note {
+  margin: auto;
+  padding: 8px;
+  text-align: center;
+  font-size: clamp(11px, calc(var(--cw) * 0.042), 18px);
+  color: var(--muted);
+}
+
+/* ---------- navigation ---------- */
+
+/* The mini-map is the card: no body padding, the stage owns every edge. */
+.w-nav {
+  display: flex;
+  padding: 0;
+  background: var(--bg-soft);
+}
+
+.nav-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.nav-map-empty {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px;
+  color: var(--faint);
+  text-align: center;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 26px 26px,
+    var(--bg-soft);
+}
+
+.nav-map-empty .icon {
+  width: clamp(22px, calc(min(var(--cw), var(--ch)) * 0.16), 44px);
+  height: auto;
+  opacity: 0.75;
+}
+
+.nav-map-note {
+  font-size: clamp(10px, calc(var(--ch) * 0.07 * var(--font-scale)), 15px);
+  color: var(--muted);
+}
+
+.nav-map {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.nav-shade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 8, 14, 0.62), rgba(4, 8, 14, 0.08) 42%, rgba(4, 8, 14, 0.55));
+}
+
+:root[data-theme="light"] .nav-shade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.62));
+}
+
+.nav-route {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  padding: clamp(6px, calc(min(var(--cw), var(--ch)) * 0.05), 16px);
+  pointer-events: none;
+}
+
+.nav-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nav-turn {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, calc(min(var(--cw), var(--ch)) * 0.03), 12px);
+  max-width: 74%;
+  min-width: 0;
+  padding: clamp(5px, calc(var(--ch) * 0.035), 10px) clamp(8px, calc(var(--ch) * 0.05), 14px);
+  border-radius: clamp(12px, calc(var(--ch) * 0.07), 20px);
+  background: rgba(9, 14, 21, 0.82);
+  color: #ffffff;
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="light"] .nav-turn {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+}
+
+.nav-turn-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: clamp(26px, calc(var(--ch) * 0.17), 60px);
+  height: clamp(26px, calc(var(--ch) * 0.17), 60px);
+  color: var(--accent-bright);
+}
+
+.nav-turn-icon .icon {
+  width: 100%;
+  height: 100%;
+}
+
+.nav-turn-dist {
+  font-size: clamp(18px, calc(var(--ch) * 0.12 * var(--font-scale)), 48px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.nav-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: clamp(4px, calc(var(--ch) * 0.03), 10px);
+  flex: none;
+}
+
+.nav-speed {
+  display: grid;
+  place-items: center;
+  width: clamp(30px, calc(var(--ch) * 0.2), 68px);
+  height: clamp(30px, calc(var(--ch) * 0.2), 68px);
+  border-radius: 50%;
+  border: clamp(3px, calc(var(--ch) * 0.026), 6px) solid #e03434;
+  background: #ffffff;
+  color: #15181d;
+  font-size: clamp(13px, calc(var(--ch) * 0.1 * var(--font-scale)), 30px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-soft);
+}
+
+.nav-gps {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: clamp(14px, calc(var(--ch) * 0.1), 28px);
+  padding: 3px 5px;
+  border-radius: 6px;
+  background: rgba(9, 14, 21, 0.72);
+}
+
+:root[data-theme="light"] .nav-gps {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.nav-gps i {
+  display: block;
+  width: clamp(3px, calc(var(--ch) * 0.022), 6px);
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.nav-gps i:nth-child(1) { height: 40%; }
+.nav-gps i:nth-child(2) { height: 55%; }
+.nav-gps i:nth-child(3) { height: 70%; }
+.nav-gps i:nth-child(4) { height: 85%; }
+.nav-gps i:nth-child(5) { height: 100%; }
+
+.nav-gps i.is-on {
+  background: var(--good);
+}
+
+.nav-gps.is-weak i {
+  background: var(--line-strong);
+}
+
+.nav-gps.is-weak i:first-child {
+  background: var(--danger);
+}
+
+.nav-bottom {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(6px, calc(min(var(--cw), var(--ch)) * 0.04), 12px);
+  min-width: 0;
+}
+
+.nav-road {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-road-name {
+  font-size: clamp(11px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  font-weight: 500;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-theme="light"] .nav-road-name {
+  color: var(--text);
+  text-shadow: none;
+}
+
+.nav-remain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+}
+
+.nav-remain-label {
+  font-size: clamp(8px, calc(var(--ch) * 0.05 * var(--font-scale)), 12px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme="light"] .nav-remain-label {
+  color: var(--muted);
+}
+
+.nav-remain-value {
+  font-size: clamp(12px, calc(var(--ch) * 0.085 * var(--font-scale)), 26px);
+  font-weight: 600;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+:root[data-theme="light"] .nav-remain-value {
+  color: var(--text);
+}
+
+.nav-open,
+.nav-launch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  height: clamp(28px, calc(var(--ch) * 0.17), 44px);
+  padding: 0 clamp(9px, calc(var(--ch) * 0.06), 16px);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: clamp(10px, calc(var(--ch) * 0.055 * var(--font-scale)), 14px);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: var(--shadow-soft);
+  transition: background 0.15s ease;
+}
+
+.nav-open:hover,
+.nav-launch:hover {
+  background: var(--accent-bright);
+}
+
+/* The buttons opt back into clicks; in edit mode the card body must stay dead
+   so a press on them drags the card instead. */
+#board.is-editing .nav-open,
+#board.is-editing .nav-launch {
+  pointer-events: none;
+}
+
+.nav-open .icon,
+.nav-launch .icon {
+  width: clamp(13px, calc(var(--ch) * 0.08), 18px);
+  height: clamp(13px, calc(var(--ch) * 0.08), 18px);
+}
+
+.nav-idle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, calc(var(--ch) * 0.03), 10px);
+  padding: clamp(10px, calc(min(var(--cw), var(--ch)) * 0.06), 20px);
+  text-align: center;
+  background: rgba(7, 11, 17, 0.68);
+}
+
+:root[data-theme="light"] .nav-idle {
+  background: rgba(235, 240, 247, 0.82);
+}
+
+.nav-idle-icon {
+  color: var(--accent);
+}
+
+.nav-idle-icon .icon {
+  width: clamp(22px, calc(min(var(--cw), var(--ch)) * 0.16), 44px);
+  height: auto;
+}
+
+.nav-idle-title {
+  font-size: clamp(13px, calc(var(--ch) * 0.09 * var(--font-scale)), 24px);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.nav-idle-hint {
+  max-width: 92%;
+  font-size: clamp(10px, calc(var(--ch) * 0.065 * var(--font-scale)), 16px);
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* A one-row nav keeps the maneuver, speed and the launch button; the road
+   name would fight the turn pill for the same line. */
+.w-nav[data-h="1"] .nav-road {
+  display: none;
+}
+
+.w-nav[data-h="1"] .nav-bottom {
+  justify-content: space-between;
+}
+
+.w-nav[data-h="1"] .nav-remain {
+  align-items: flex-start;
+}
+
+.w-nav[data-h="1"] .nav-remain-label {
+  display: none;
+}
+
+.w-nav[data-h="1"] .nav-open {
+  width: clamp(28px, calc(var(--ch) * 0.17), 44px);
+  padding: 0;
+}
+
+.w-nav[data-h="1"] .nav-open .nav-launch-label {
+  display: none;
+}
+
+.w-nav[data-h="1"] .nav-idle {
+  gap: 4px;
+}
+
+.w-nav[data-h="1"] .nav-idle-icon {
+  display: none;
+}
+
+.w-nav[data-h="1"] .nav-idle-title {
+  font-size: clamp(12px, calc(var(--ch) * 0.1 * var(--font-scale)), 20px);
+}

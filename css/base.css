@@ -1,0 +1,507 @@
+/* Reset, page frame, header, buttons and toast. Everything is sized for a
+   fixed kiosk viewport: the page never scrolls, the board fills the rest. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background:
+    radial-gradient(120vmin 90vmin at 12% -20%, rgba(63, 157, 255, 0.1), transparent 60%),
+    radial-gradient(90vmin 80vmin at 108% 112%, rgba(63, 157, 255, 0.06), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", Roboto, "Noto Sans", system-ui, -apple-system, sans-serif;
+  font-size: calc(15px * var(--font-scale));
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(120vmin 90vmin at 12% -20%, rgba(31, 116, 224, 0.09), transparent 60%),
+    radial-gradient(90vmin 80vmin at 108% 112%, rgba(31, 116, 224, 0.06), transparent 60%),
+    var(--bg);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+img {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+.icon {
+  display: block;
+  flex: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- wallpaper ---------- */
+
+#wallpaper {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  z-index: 0;
+  background-color: var(--bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* The scrim keeps header text and the gaps between cards readable on a
+   bright photo; it is absent when no wallpaper is chosen. */
+#wallpaper::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(7, 10, 15, 0.55), rgba(7, 10, 15, 0.18) 26%, rgba(7, 10, 15, 0.45)),
+    radial-gradient(120% 80% at 50% 0%, transparent 40%, rgba(7, 10, 15, 0.35));
+}
+
+:root[data-theme="light"] #wallpaper::after {
+  background: linear-gradient(180deg, rgba(232, 237, 244, 0.6), rgba(232, 237, 244, 0.28) 40%, rgba(232, 237, 244, 0.55));
+}
+
+#wallpaper.is-blank::after {
+  display: none;
+}
+
+/* ---------- page frame ---------- */
+
+#app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding:
+    env(safe-area-inset-top, 0)
+    max(var(--gap), env(safe-area-inset-right, 0))
+    max(var(--gap), env(safe-area-inset-bottom, 0))
+    max(var(--gap), env(safe-area-inset-left, 0));
+  opacity: 0;
+  transition: opacity 0.32s ease;
+}
+
+#app.is-ready {
+  opacity: 1;
+}
+
+#header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--gap);
+  height: var(--header-h);
+  flex: none;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar-slot {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.4vmin, 16px);
+  min-width: 0;
+}
+
+.topbar-slot--left {
+  justify-content: flex-start;
+}
+
+.topbar-slot--center {
+  justify-content: center;
+}
+
+.topbar-slot--right {
+  justify-content: flex-end;
+}
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px var(--accent-border);
+}
+
+.brand-name {
+  font-size: clamp(15px, 1.65vmin, 20px);
+  font-weight: 650;
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: clamp(30px, 4.4vmin, 40px);
+  padding: 0 clamp(9px, 1.3vmin, 15px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--control);
+  font-size: clamp(12px, 1.45vmin, 15px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip .icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.75;
+}
+
+.chip-value {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-label {
+  color: var(--muted);
+}
+
+.chip-warn {
+  border-color: rgba(255, 180, 84, 0.36);
+  color: var(--warn);
+}
+
+.chip-warn .chip-value {
+  color: var(--warn);
+}
+
+.chip-danger {
+  border-color: rgba(255, 107, 107, 0.36);
+  color: var(--danger);
+}
+
+.chip-danger .chip-value {
+  color: var(--danger);
+}
+
+.topbar-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.12;
+  min-width: 0;
+}
+
+.topbar-time {
+  font-size: clamp(18px, calc(var(--header-h) * 0.36), 30px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.topbar-date {
+  font-size: clamp(11px, 1.25vmin, 13px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(6px, 0.8vmin, 10px);
+  min-width: 0;
+}
+
+/* ---------- controls ---------- */
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: clamp(38px, 5vmin, 48px);
+  height: clamp(38px, 5vmin, 48px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--muted);
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.icon-btn .icon {
+  width: 46%;
+  height: 46%;
+}
+
+.icon-btn:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+
+.icon-btn.is-on,
+.icon-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--control);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.btn:hover {
+  background: var(--control-hover);
+}
+
+.btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  background: var(--control);
+  color: var(--text);
+}
+
+.btn.is-danger {
+  border-color: rgba(255, 107, 107, 0.5);
+  color: var(--danger);
+}
+
+/* ---------- preloader ---------- */
+
+#preloader {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--bg);
+  transition: opacity 0.34s ease;
+}
+
+#preloader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader-ring {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.preloader-text {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--gap) + 86px);
+  /* Above the settings overlay: toasts are raised from inside it. */
+  z-index: 160;
+  max-width: min(80vw, 560px);
+  padding: 11px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card-solid);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast-warn {
+  border-color: rgba(255, 180, 84, 0.45);
+  color: var(--warn);
+}
+
+.toast-danger {
+  border-color: rgba(255, 107, 107, 0.45);
+  color: var(--danger);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---------- narrow headers ---------- */
+
+/* Three equal slots leave the left one about a third of the screen. On the
+   13–15" portrait units the brand plus three chips need more than that, so
+   the row tightens before it starts clipping at the slot edge. */
+@media (max-width: 1300px) {
+  .topbar-slot {
+    gap: 9px;
+  }
+
+  .chips {
+    gap: 5px;
+  }
+
+  .chip {
+    gap: 5px;
+    padding: 0 9px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .chip-label {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .brand-name {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .chips {
+    display: none;
+  }
+
+  .topbar-date {
+    display: none;
+  }
+
+  #header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .topbar-clock {
+    align-items: center;
+  }
+}

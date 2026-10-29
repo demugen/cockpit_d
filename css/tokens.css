@@ -1,0 +1,66 @@
+/* Design tokens. Dark is the default: head units spend most of their life
+   in a dark cabin. The light theme keeps the same geometry. */
+
+:root {
+  color-scheme: dark;
+
+  --font-scale: 1;
+  --gap: clamp(8px, 1.1vmin, 14px);
+  --radius: clamp(14px, 1.7vmin, 22px);
+  --radius-sm: clamp(9px, 1vmin, 13px);
+  --edge: clamp(10px, 1.5vmin, 20px);
+
+  --bg: #070a0f;
+  --bg-soft: #0c1118;
+  --card: rgba(21, 27, 37, 0.94);
+  --card-solid: #141a24;
+  --control: rgba(255, 255, 255, 0.055);
+  --control-hover: rgba(255, 255, 255, 0.11);
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #edf2fa;
+  --muted: #8b96a8;
+  --faint: #5d687a;
+
+  --accent: #3f9dff;
+  --accent-bright: #7cc2ff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(63, 157, 255, 0.16);
+  --accent-border: rgba(63, 157, 255, 0.4);
+  --good: #45d18d;
+  --warn: #ffb454;
+  --danger: #ff6b6b;
+
+  --shadow: 0 14px 38px rgba(0, 0, 0, 0.32);
+  --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.22);
+  --header-h: clamp(52px, 8.4vmin, 78px);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #e8edf4;
+  --bg-soft: #f4f7fb;
+  --card: rgba(255, 255, 255, 0.92);
+  --card-solid: #ffffff;
+  --control: rgba(17, 28, 43, 0.055);
+  --control-hover: rgba(17, 28, 43, 0.11);
+  --line: rgba(17, 28, 43, 0.09);
+  --line-strong: rgba(17, 28, 43, 0.18);
+
+  --text: #111823;
+  --muted: #5b6678;
+  --faint: #6d7889;
+
+  --accent: #1f74e0;
+  --accent-bright: #4a9cf0;
+  --accent-soft: rgba(31, 116, 224, 0.12);
+  --accent-border: rgba(31, 116, 224, 0.38);
+  --good: #15965c;
+  --warn: #b56a00;
+  --danger: #d13c3c;
+
+  --shadow: 0 14px 38px rgba(25, 42, 68, 0.14);
+  --shadow-soft: 0 6px 18px rgba(25, 42, 68, 0.1);
+}
