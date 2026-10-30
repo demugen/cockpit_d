@@ -1,14 +1,17 @@
 'use strict';
 
-/* The host opens its own climate dialog per command, so adjustments are
-   buffered. These tests pin the batching contract without waiting 10 s. */
+/* A burst of climate taps leaves as one command with the final value, and the
+   panel never presses a system action of its own. These tests pin both
+   contracts without waiting for the real timers. */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { mock } = require('node:test');
 
 function harness() {
   const utils = require('../js/core/utils.js');
   const commands = [];
+  const enums = [];
   const events = [];
   const read = {
     available: true,
@@ -35,6 +38,10 @@ function harness() {
       commands.push(Object.assign({}, message));
       if (message.cmd === 'climate_get_state') return Object.assign({ success: true }, read);
       return { success: true };
+    },
+    runEnum(name) {
+      enums.push(name);
+      return { ok: true, error: null };
     }
   };
   global.window = global;
@@ -53,14 +60,14 @@ function harness() {
   const service = global.App.services.climate;
   service.refresh();
   commands.length = 0;
-  return { service, commands, events, read };
+  return { service, commands, enums, events, read };
 }
 
 function tempCommands(commands) {
   return commands.filter((entry) => entry.cmd === 'climate_set_temperature');
 }
 
-test('temperature taps wait in the buffer and leave as one final command', () => {
+test('temperature taps wait for a short pause and leave as one final command', () => {
   const h = harness();
   assert.equal(h.service.setTemperature(1, 1), true);
   assert.equal(h.service.setTemperature(1, 1), true);
@@ -70,13 +77,6 @@ test('temperature taps wait in the buffer and leave as one final command', () =>
   assert.equal(h.service.state().queueCount, 1);
   assert.equal(h.service.state().driverTemperature, 25);
   assert.equal(h.service.state().pending.driverTemperature.queued, true);
-
-  const queueEvents = h.events.filter((event) => event.name === 'climate:queue');
-  assert.equal(queueEvents.length, 3, 'every tap refreshes the countdown');
-  assert.equal(queueEvents[0].payload.fresh, true);
-  assert.equal(queueEvents[2].payload.fresh, false);
-  assert.equal(queueEvents[2].payload.count, 1);
-  assert.equal(queueEvents[2].payload.delay, 10);
 
   h.service.flush();
   assert.deepEqual(tempCommands(h.commands), [
@@ -116,7 +116,7 @@ test('sync moves both zones and sends two ordered commands in one batch', () => 
   ]);
 });
 
-test('mode toggles go out immediately and stay out of the buffer', () => {
+test('mode toggles go out immediately and stay out of the batch', () => {
   const h = harness();
   assert.equal(h.service.toggle('auto'), true);
   assert.equal(h.service.state().queueCount, 0);
@@ -135,4 +135,51 @@ test('different controls keep their own batch and send in order', () => {
   assert.deepEqual(sent, ['climate_set_temperature', 'climate_set_fan_speed']);
   assert.deepEqual(h.commands[0], { cmd: 'climate_set_temperature', zone: 2, value: 21 });
   assert.deepEqual(h.commands[1], { cmd: 'climate_set_fan_speed', value: 4 });
+});
+
+test('the panel never presses a system action of its own', () => {
+  const h = harness();
+  assert.equal(h.service.setTemperature(1, 1), true);
+  h.service.flush();
+  assert.deepEqual(h.enums, [], 'the removed GLOBAL_BACK workaround stays removed');
+});
+
+/* Fake timers pin the batch window itself: 2 s of quiet, 4 s from the first
+   tap. The harness drives the same setTimeout the service arms. */
+
+function clock(t) {
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  t.after(() => mock.timers.reset());
+  return harness();
+}
+
+test('the batch waits two seconds after the last tap', (t) => {
+  const h = clock(t);
+  assert.equal(h.service.setTemperature(1, 1), true);
+  mock.timers.tick(1999);
+  assert.deepEqual(h.commands, [], 'one millisecond short of the pause sends nothing');
+
+  assert.equal(h.service.setTemperature(1, 1), true);
+  mock.timers.tick(1999);
+  assert.deepEqual(h.commands, [], 'a new tap restarts the whole pause');
+
+  mock.timers.tick(1);
+  assert.deepEqual(tempCommands(h.commands), [
+    { cmd: 'climate_set_temperature', zone: 1, value: 24 }
+  ], 'both taps leave as one command with the final value');
+});
+
+test('a burst that never pauses stops at the four second cap', (t) => {
+  const h = clock(t);
+  assert.equal(h.service.setTemperature(1, 1), true);
+  for (let tap = 0; tap < 3; tap += 1) {
+    mock.timers.tick(1000);
+    assert.equal(h.service.setTemperature(1, 1), true);
+  }
+  assert.deepEqual(h.commands, [], 'taps every second keep the batch waiting');
+
+  mock.timers.tick(1000);
+  assert.deepEqual(tempCommands(h.commands), [
+    { cmd: 'climate_set_temperature', zone: 1, value: 26 }
+  ], 'four seconds after the first tap the last value goes out');
 });

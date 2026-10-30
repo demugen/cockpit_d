@@ -24,6 +24,9 @@
       var art = dom.create('div', 'media-art');
       var image = dom.create('img', 'media-image');
       image.alt = '';
+      // An <img> with no picture yet paints the WebView's broken-image outline
+      // inside the cover square, so it starts hidden and only shows on load.
+      image.hidden = true;
       var placeholder = dom.create('div', 'media-placeholder');
       placeholder.appendChild(dom.icon('music', 30));
       art.appendChild(image);

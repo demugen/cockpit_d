@@ -23,11 +23,12 @@
   // A slow host must not snap the UI back to a pre-command read. Pending
   // values survive unmatched reads for this long, then the car wins.
   var PENDING_TTL = 5000;
-  // The host opens its own climate dialog for every command. Adjustments are
-  // batched: the final value of each control goes out once, 10 s after the
-  // user stopped tapping, and a long session is capped at 30 s.
-  var QUEUE_MS = 10000;
-  var QUEUE_MAX_MS = 30000;
+  // The host opens its own climate dialog for every command, so a burst of
+  // taps is merged: the final value of every touched control goes out once,
+  // 2 s after the last tap, so there is time to move from temperature to fan.
+  // A continuous burst is capped at 4 s.
+  var BATCH_MS = 2000;
+  var BATCH_MAX_MS = 4000;
 
   var state = {
     available: false,
@@ -184,7 +185,7 @@
   }
 
   function nextFlushAt() {
-    return Math.min(queueLastAt + QUEUE_MS, queueStartedAt + QUEUE_MAX_MS);
+    return Math.min(queueLastAt + BATCH_MS, queueStartedAt + BATCH_MAX_MS);
   }
 
   function armQueue() {
@@ -229,7 +230,6 @@
   function enqueue(key, steps, pendingKeys, previous) {
     if (!state.available) return false;
     var now = Date.now();
-    var batchNew = !Object.keys(queue).length;
     var entry = queue[key];
     if (!entry) {
       entry = queue[key] = { steps: [], keys: [], previous: {}, seq: queueSeq += 1 };
@@ -253,11 +253,6 @@
     state.queueCount = Object.keys(queue).length;
     armQueue();
     emitIfChanged();
-    bus.emit('climate:queue', {
-      count: state.queueCount,
-      fresh: batchNew,
-      delay: Math.round(Math.max(0, nextFlushAt() - now) / 1000)
-    });
     return true;
   }
 

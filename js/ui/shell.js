@@ -200,10 +200,6 @@
     bus.on('climate:command', function (result) {
       if (!result.ok) toast('Климат не принял команду', 'warn');
     });
-    bus.on('climate:queue', function (info) {
-      if (!info || !info.fresh) return;
-      toast('Климат: отправка через ' + info.delay + ' с');
-    });
     bus.on('media:command', function (result) {
       if (!result.ok) toast('Плеер не принял команду', 'warn');
     });
