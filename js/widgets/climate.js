@@ -68,13 +68,23 @@
         var box = dom.create('div', 'cl-fan');
         box.appendChild(dom.create('div', 'cl-label', 'Поток'));
         var row = dom.create('div', 'cl-zone-row');
-        var minus = makeButton('cl-step', 'minus', '', { act: 'fan', delta: '-1' }, disabled);
+        row.style.justifyContent = 'space-between';
+        row.style.width = '100%';
+        
+        // Fan down button
+        var minus = makeButton('cl-step', 'minus', '', { act: 'fan_down', delta: '-1' }, disabled);
         minus.setAttribute('aria-label', 'Меньше поток');
+        minus.title = 'Уменьшить вентилятор';
+        
         var valueNode = dom.create('div', 'cl-value cl-fan-value');
         valueNode.appendChild(dom.icon('fan', 20));
         valueNode.appendChild(dom.create('span', '', String(value)));
-        var plus = makeButton('cl-step', 'plus', '', { act: 'fan', delta: '1' }, disabled);
+        
+        // Fan up button
+        var plus = makeButton('cl-step', 'plus', '', { act: 'fan_up', delta: '1' }, disabled);
         plus.setAttribute('aria-label', 'Больше поток');
+        plus.title = 'Увеличить вентилятор';
+        
         row.appendChild(minus);
         row.appendChild(valueNode);
         row.appendChild(plus);
@@ -109,8 +119,26 @@
         return row;
       }
 
+      // climate:change fires on every poll and on every queued tap; rebuilding
+      // the whole card between pointerdown and pointerup would swallow taps.
+      // Rebuild only when something the card shows has changed.
+      var shownKey = '';
+
       function build() {
         var state = service.state();
+        var pending = state.pending || {};
+        var key = [
+          state.available,
+          state.driverTemperature,
+          state.passengerTemperature,
+          state.fanSpeed,
+          state.power, state.ac, state.auto, state.recirculation, state.sync,
+          !!pending.power, !!pending.ac, !!pending.auto, !!pending.recirculation, !!pending.sync,
+          ctx.size.w + 'x' + ctx.size.h
+        ].join('|');
+        if (key === shownKey) return;
+        shownKey = key;
+
         dom.clear(node);
         node.classList.toggle('is-unavailable', !state.available);
 
@@ -132,7 +160,8 @@
         event.stopPropagation();
         var action = target.dataset.act;
         if (action === 'temp') service.setTemperature(Number(target.dataset.zone), Number(target.dataset.delta));
-        else if (action === 'fan') service.setFanSpeed(Number(target.dataset.delta));
+        else if (action === 'fan_up') service.fanUp();
+        else if (action === 'fan_down') service.fanDown();
         else if (action === 'toggle') service.toggle(target.dataset.key);
       });
 

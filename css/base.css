@@ -283,8 +283,8 @@ p {
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: clamp(38px, 5vmin, 48px);
-  height: clamp(38px, 5vmin, 48px);
+  width: clamp(46px, 6.4vmin, 60px);
+  height: clamp(46px, 6.4vmin, 60px);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--control);
@@ -293,8 +293,21 @@ p {
 }
 
 .icon-btn .icon {
-  width: 46%;
-  height: 46%;
+  width: 54%;
+  height: 54%;
+}
+
+/* Header targets are sized against the bar itself, which grid.js mirrors as
+   HEADER, so the bar height must not change here — only the share of it the
+   button takes. The scale multiplies up to the bar, never past it. */
+.topbar-actions .icon-btn {
+  width: min(calc(var(--header-h) - 6px), calc((var(--header-h) - 8px) * var(--font-scale)));
+  height: min(calc(var(--header-h) - 6px), calc((var(--header-h) - 8px) * var(--font-scale)));
+}
+
+.topbar-actions .icon-btn .icon {
+  width: 56%;
+  height: 56%;
 }
 
 .icon-btn:hover {

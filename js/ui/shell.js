@@ -24,13 +24,25 @@
   var chipsWanted = false;
   var chipsOn = false;
 
+  /* The panel alpha is theme base x (1 - transparency): writing the product
+     here keeps calc() out of the color, which an old car WebView would not
+     parse inside rgba(). */
+  var CARD_BASE_ALPHA = { dark: 0.94, light: 0.92 };
+  // The head unit reports its current theme; it wins over the WebView media
+  // query while the user keeps the panel on "auto".
+  var hostTheme = null;
+
   function applyTheme(state) {
     var theme = state.theme;
     if (theme === 'auto') {
-      theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      if (hostTheme === 'light' || hostTheme === 'dark') theme = hostTheme;
+      else theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.style.setProperty('--font-scale', String(state.fontScale));
+    var base = CARD_BASE_ALPHA[theme] || CARD_BASE_ALPHA.dark;
+    var peel = utils.clamp(utils.toNumber(state.transparency, 0), 0, 60) / 100;
+    document.documentElement.style.setProperty('--card-alpha', (base * (1 - peel)).toFixed(3));
   }
 
   function tickClock() {
@@ -114,6 +126,19 @@
     if (!record.ok) toast('Закрытие недоступно', 'warn');
   }
 
+  // The clock widget already shows the same time in the board: drawing a second
+  // clock in the header is noise, so the header one steps aside while the
+  // widget is on the active layout.
+  function clockWidgetShown(state) {
+    var viewport = App.ui.viewport;
+    var axis = viewport && typeof viewport.orientation === 'function'
+      ? viewport.orientation()
+      : 'landscape';
+    var enabled = state.widgets && state.widgets.enabled && state.widgets.enabled.clock;
+    var layout = state.layouts && state.layouts[axis];
+    return !!enabled && !!(layout && layout.items && layout.items.clock);
+  }
+
   /* Header layout is three slots: logo on the left and the action buttons on
      the right are fixed, the clock and the car chips can live in any slot. */
   function layoutHeader(state) {
@@ -121,13 +146,15 @@
     var headerSettings = state.header || {};
     var clockSlot = headerSettings.clockSlot || 'center';
     var chipsSlot = headerSettings.chipsSlot || 'left';
+    var showClock = !clockWidgetShown(state);
+    clockNode.hidden = !showClock;
 
     ['left', 'center', 'right'].forEach(function (name) {
       var slot = slots[name];
       dom.clear(slot);
       if (name === 'left') slot.appendChild(titleNode);
       if (chipsSlot === name) slot.appendChild(chipsNode);
-      if (clockSlot === name) slot.appendChild(clockNode);
+      if (clockSlot === name && showClock) slot.appendChild(clockNode);
       if (name === 'right') slot.appendChild(actionsNode);
     });
   }
@@ -190,18 +217,29 @@
       syncChipsDemand(event.state);
       renderChips();
     });
+    bus.on('android:theme', function (data) {
+      var mode = data && typeof data === 'object' ? data.mode : null;
+      if (mode !== 'light' && mode !== 'dark') return;
+      hostTheme = mode;
+      var state = settings.get();
+      // An explicit dark/light choice in the panel wins over the head unit.
+      if (!state || state.theme !== 'auto') return;
+      applyTheme(state);
+      bus.emit('theme:change', { theme: mode, source: 'host' });
+    });
     bus.on('car:change', renderChips);
     bus.on('apps:launch', function (result) {
-      if (!result.ok) toast('Не удалось запустить: ' + (result.error || 'ошибка'), 'warn');
+      if (result.ok) return;
+      // A bare `unauthorized` in a toast is the host's vocabulary, not the
+      // driver's.
+      toast('Не удалось запустить: ' + utils.errorText(result.error, 'приложение не отвечает'), 'warn');
     });
     bus.on('apps:action', function (result) {
-      if (!result.ok) toast('Действие недоступно: ' + (result.error || 'ошибка'), 'warn');
+      if (result.ok) return;
+      toast('Действие недоступно: ' + utils.errorText(result.error, 'ГУ не принял команду'), 'warn');
     });
     bus.on('climate:command', function (result) {
       if (!result.ok) toast('Климат не принял команду', 'warn');
-    });
-    bus.on('media:command', function (result) {
-      if (!result.ok) toast('Плеер не принял команду', 'warn');
     });
 
     if (window.matchMedia) {

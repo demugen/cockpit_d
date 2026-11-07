@@ -23,7 +23,8 @@
       node.classList.add('w-cardata');
       ctx.demand('car', true);
 
-      var lastKey = '';
+      var refs = [];
+      var structKey = '';
 
       function applySize(size) {
         node.dataset.w = String(size.w);
@@ -75,6 +76,25 @@
         return tile;
       }
 
+      // While driving the snapshot changes on every poll: repaint the values of
+      // the existing tiles in place instead of rebuilding the card. A rebuild
+      // between pointerdown and pointerup would swallow taps, and recreating
+      // every node each 2–5 s only adds jank on a slow head unit.
+      function paintRefs(visible, state) {
+        if (refs.length !== visible.length) return false;
+        for (var i = 0; i < refs.length; i += 1) {
+          var ref = refs[i];
+          var metric = metricFor(ref.id, state);
+          if (!metric) return false;
+          dom.text(ref.value, metric.value);
+          if (ref.unit) dom.text(ref.unit, metric.unit || '');
+          if (ref.subValue) dom.text(ref.subValue, metric.sub || '');
+          if (ref.subUnit) dom.text(ref.subUnit, metric.subUnit || '');
+          ref.tile.className = 'car-tile' + (metric.tone ? ' is-' + metric.tone : '');
+        }
+        return true;
+      }
+
       function build() {
         var state = service.state();
         var size = ctx.size;
@@ -83,7 +103,12 @@
         var visible = ids.slice(0, Math.max(1, capacity));
 
         service.setWatched(watchKeys(visible));
+        var key = settingsKey() + '|' + (state.available ? 'live' : 'off');
+        if (key === structKey && paintRefs(visible, state)) return;
+        structKey = key;
+
         dom.clear(node);
+        refs = [];
         node.classList.toggle('is-empty', !state.available);
 
         if (!state.available) {
@@ -98,19 +123,25 @@
         var grid = dom.create('div', 'car-grid');
         visible.forEach(function (id) {
           var metric = metricFor(id, state);
-          if (metric) grid.appendChild(tileOf(metric));
+          if (!metric) return;
+          var tile = tileOf(metric);
+          refs.push({
+            id: id,
+            tile: tile,
+            value: tile.querySelector('.car-value'),
+            unit: tile.querySelector('.car-unit'),
+            subValue: tile.querySelector('.car-sub-value'),
+            subUnit: tile.querySelector('.car-sub-unit')
+          });
+          grid.appendChild(tile);
         });
         node.appendChild(grid);
       }
 
       ctx.on('car:change', build);
-      ctx.on('settings:change', function () {
-        var key = settingsKey();
-        if (key !== lastKey) {
-          lastKey = key;
-          build();
-        }
-      });
+      // build() сам решает по структурному ключу, менять ли DOM: смена слотов
+      // или tankLiters меняет ключ, остальные изменения он пропускает.
+      ctx.on('settings:change', build);
 
       applySize(ctx.size);
       build();

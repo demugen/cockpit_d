@@ -76,6 +76,9 @@
       volumeBox.dataset.nodrag = 'true';
       var volumeIcon = dom.create('span', 'media-volume-icon');
       volumeIcon.appendChild(dom.icon('volume', 18));
+      var downButton = dom.button('media-btn media-vol-step', '', 'minus');
+      downButton.dataset.act = 'vol-down';
+      downButton.setAttribute('aria-label', 'Тише');
       var volumeSlider = dom.create('input', 'media-slider range-input');
       volumeSlider.type = 'range';
       volumeSlider.min = '0';
@@ -83,9 +86,14 @@
       volumeSlider.step = '1';
       volumeSlider.value = '50';
       volumeSlider.setAttribute('aria-label', 'Громкость');
+      var upButton = dom.button('media-btn media-vol-step', '', 'plus');
+      upButton.dataset.act = 'vol-up';
+      upButton.setAttribute('aria-label', 'Громче');
       var volumeValue = dom.create('span', 'media-vol-value', '—');
       volumeBox.appendChild(volumeIcon);
+      volumeBox.appendChild(downButton);
       volumeBox.appendChild(volumeSlider);
+      volumeBox.appendChild(upButton);
       volumeBox.appendChild(volumeValue);
 
       controls.appendChild(playButton);
@@ -110,15 +118,34 @@
         dom.text(duration, utils.formatDuration(total / 1000));
       }
 
+      // While the finger is on the slider its own value is the truth: paint()
+      // must not write the host level back into the middle of a drag.
+      var dragging = false;
+      var stepsExplained = false;
+
+      function shownVolume() {
+        var state = service.state();
+        return dragging ? Number(volumeSlider.value) : state.volume;
+      }
+
       function paintVolume(volume) {
         var known = typeof volume === 'number' && isFinite(volume);
-        var shown = known ? Math.round(volume) : 50;
-        if (document.activeElement !== volumeSlider) volumeSlider.value = String(shown);
+        var shown = known ? Math.round(volume) : Number(volumeSlider.value || 50);
+        if (!dragging && document.activeElement !== volumeSlider) {
+          volumeSlider.value = String(known ? shown : 50);
+        }
         var current = Number(volumeSlider.value);
         volumeSlider.style.setProperty('--fill', current + '%');
-        var focused = document.activeElement === volumeSlider;
-        dom.text(volumeValue, known || focused ? current + '%' : '—');
+        dom.text(volumeValue, known || dragging || document.activeElement === volumeSlider ? current + '%' : '—');
         volumeSlider.setAttribute('aria-valuetext', current + '%');
+        var mode = service.state().volumeMode;
+        volumeSlider.disabled = mode === 'none';
+        downButton.disabled = mode === 'none';
+        upButton.disabled = mode === 'none';
+        var hint = mode === 'exact' ? 'Громкость ГУ'
+          : mode === 'steps' ? 'Громкость: шаг 1 %, ГУ не принимает точное значение'
+            : 'ГУ не разрешает управлять громкостью';
+        volumeBox.title = hint;
       }
 
       function paint() {
@@ -157,11 +184,23 @@
         updateProgress(state.position, state.duration);
       }
 
+      volumeSlider.addEventListener('pointerdown', function () { dragging = true; });
       volumeSlider.addEventListener('input', function () {
-        paintVolume(service.state().volume);
+        dragging = true;
+        paintVolume(shownVolume());
       });
-      volumeSlider.addEventListener('change', function () {
+      // "change" also fires for the keyboard, where no pointerdown ran: force
+      // covers it, while pointerup only commits a drag that actually started.
+      function commit(force) {
+        if (!dragging && !force) return;
+        dragging = false;
         if (!service.setVolume(Number(volumeSlider.value))) paint();
+      }
+      volumeSlider.addEventListener('change', function () { commit(true); });
+      ctx.listen(window, 'pointerup', function () { commit(false); });
+      ctx.listen(window, 'pointercancel', function () {
+        dragging = false;
+        paint();
       });
 
       dom.delegate(node, '[data-act]', 'click', function (event, target) {
@@ -170,11 +209,31 @@
         var action = target.dataset.act;
         if (action === 'play') service.playPause();
         else if (action === 'next') service.nextTrack();
+        else if (action === 'vol-up') service.nudgeVolume(5);
+        else if (action === 'vol-down') service.nudgeVolume(-5);
       });
 
       ctx.on('media:change', paint);
       ctx.on('media:tick', function (tick) {
         updateProgress(tick.position, tick.duration);
+      });
+      ctx.on('media:command', function (result) {
+        if (result.ok) {
+          // Explaining the 1 % steps once is useful; repeating it on every
+          // drag buries the rest of the toasts.
+          if (result.mode === 'steps' && !stepsExplained) {
+            stepsExplained = true;
+            ctx.toast('Громкость меняется шагами по 1 %', '');
+          }
+          return;
+        }
+        var reasons = {
+          unavailable: 'ГУ не умеет менять громкость',
+          unknown_level: 'ГУ не отдаёт текущую громкость',
+          unauthorized: 'ГУ не разрешил менять громкость',
+          license_required: 'Громкость доступна по лицензии JCarTools'
+        };
+        ctx.toast(reasons[result.error] || utils.errorText(result.error, 'Плеер не принял команду'), 'warn');
       });
 
       applySize(ctx.size);

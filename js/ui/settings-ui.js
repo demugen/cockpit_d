@@ -7,6 +7,7 @@
   var bridge = App.core.bridge;
   var storage = App.core.storage;
   var utils = App.core.utils;
+  var grid = App.core.grid;
   var slots = App.core.slots;
   var metrics = App.core.carMetrics;
   var seatCatalog = App.core.seatCatalog;
@@ -32,6 +33,7 @@
 
   var THEME_LABELS = { dark: 'Тёмная', light: 'Светлая', auto: 'Авто' };
   var FONT_LABELS = [[0.9, 'Мелкий'], [1, 'Обычный'], [1.15, 'Крупный'], [1.3, 'Максимум']];
+  var TRANSPARENCY_LABELS = [[0, 'Нет'], [20, 'Слабая'], [40, 'Средняя'], [60, 'Сильная']];
   var AXIS_LABELS = { landscape: 'горизонтальный', portrait: 'вертикальный' };
   var SLOT_LABELS = [['left', 'Слева'], ['center', 'Центр'], ['right', 'Справа']];
   var ROTATE_LABELS = [[0, 'Выкл'], [10, '10 мин'], [30, '30 мин'], [60, '1 ч'], [180, '3 ч']];
@@ -505,6 +507,14 @@
       })
     ));
 
+    block.appendChild(settingRow(
+      'Прозрачность виджетов',
+      'Сквозь панели видно обои; текст остаётся сплошным',
+      chips(TRANSPARENCY_LABELS, state.transparency, function (value) {
+        settings.patch({ transparency: value });
+      })
+    ));
+
     return block;
   }
 
@@ -628,7 +638,11 @@
         toggle(enabled, def.title, function (next) {
           var result = settings.setEnabled(def.id, next);
           if (!result.ok) {
-            shell.toast('Нет места на сетке для этого виджета', 'warn');
+            // Name the size the card needs: "нет места" alone leaves the driver
+            // guessing which cards to shrink.
+            var size = grid.defaultSizeFor(def, result.axis);
+            shell.toast('Не помещается: нужно ' + size.w + '×' + size.h +
+              ' клетки. Освободите место на сетке', 'warn');
             renderBody();
           }
         }),
@@ -648,7 +662,28 @@
         buildSlotSection(block, appSlotConfig());
       }
 
+      if (def.id === 'nav') {
+        var navSettings = state.widgets.settings.nav || {};
+        var mapTheme = navSettings.mapTheme || 'auto';
+        block.appendChild(settingRow(
+          'Тема мини-карты',
+          'Дневная, ночная или автоматическая (по теме панели)',
+          chips([['auto', 'Авто'], ['day', 'Дневная'], ['night', 'Ночная']], mapTheme, function (value) {
+            settings.setWidgetSettings('nav', { mapTheme: value });
+          })
+        ));
+      }
+
       if (def.id === 'seats') {
+        var seatsSettings = state.widgets.settings.seats || {};
+        var rearMaxLevel = seatsSettings.rearMaxLevel || 3;
+        block.appendChild(settingRow(
+          'Уровней задних подогревов',
+          'Количество ступеней для задних сидений (2 или 3)',
+          chips([[2, '2 уровня'], [3, '3 уровня']], rearMaxLevel, function (value) {
+            settings.setWidgetSettings('seats', { rearMaxLevel: value });
+          })
+        ));
         buildSlotSection(block, seatSlotConfig());
       }
 

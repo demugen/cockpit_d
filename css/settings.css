@@ -599,6 +599,24 @@ body.modal-open {
   mask-image: url('../assets/icons/seat-vent-right.svg');
 }
 
+/* Built-in heater toggles of the seats widget: without these rules the
+   brand-mask span renders as a solid 22px square (background: currentColor
+   with no mask image). Asset names match seat-catalog mask ids. */
+.brand-mask--heater-front-glass-heat {
+  -webkit-mask-image: url('../assets/icons/glass-heat.svg');
+  mask-image: url('../assets/icons/glass-heat.svg');
+}
+
+.brand-mask--heater-rear-defrost {
+  -webkit-mask-image: url('../assets/icons/rear-window.svg');
+  mask-image: url('../assets/icons/rear-window.svg');
+}
+
+.brand-mask--heater-steering-wheel-heat {
+  -webkit-mask-image: url('../assets/icons/steering-wheel-heat.svg');
+  mask-image: url('../assets/icons/steering-wheel-heat.svg');
+}
+
 .picker-text {
   min-width: 0;
 }

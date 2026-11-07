@@ -65,6 +65,13 @@
   var queueStartedAt = 0;
   var queueLastAt = 0;
 
+  // Async polling state
+  var pollRequestId = 0;
+  var pollPending = false;
+  var currentPollRequestId = null;
+  var lastSuccessfulPoll = 0;
+  var POLL_TIMEOUT_MS = 5000;
+
   // A read clears only the keys it confirms. Everything still waiting for the
   // host keeps its optimistic value, and each command owns its own keys.
   function acceptPending(key, value) {
@@ -122,18 +129,110 @@
     bus.emit('climate:change', state);
   }
 
+  // Incoming carResponse for climate_get_state polls and climate command results.
+  function handleCarResponse(payload) {
+    if (!payload || payload.requestType !== 'command') return;
+    var response = payload.response;
+    if (typeof response === 'string') {
+      try { response = JSON.parse(response); } catch (e) { return; }
+    }
+    if (!response) return;
+
+    // Climate state poll response — matched by requestId. The host echoes the
+    // command name in `command` (manifest format), some proxies in `cmd`;
+    // only reject when a *different* command is explicitly named.
+    if (payload.requestId === currentPollRequestId) {
+      var pollCmd = response.command || response.cmd;
+      if (pollCmd && pollCmd !== 'climate_get_state') return;
+      pollPending = false;
+      currentPollRequestId = null;
+      if (response.success === false) {
+        if (!state.available) {
+          state.error = response.error || 'unavailable';
+          emitIfChanged();
+        }
+        return;
+      }
+      lastSuccessfulPoll = Date.now();
+      apply(response);
+      emitIfChanged();
+      return;
+    }
+
+    // Command response — match by requestId stored in pending entries
+    var matchedKey = null;
+    Object.keys(state.pending).forEach(function (key) {
+      var entry = state.pending[key];
+      if (entry && entry.requestId === payload.requestId) matchedKey = key;
+    });
+    if (!matchedKey) return;
+
+    var entry = state.pending[matchedKey];
+    if (response.success === false) {
+      // Command failed — revert pending state
+      delete state.pending[matchedKey];
+      var prev = previousForKey(matchedKey);
+      if (prev !== undefined) {
+        state[matchedKey] = prev;
+      }
+      state.error = response.error || 'command failed';
+      emitIfChanged();
+      return;
+    }
+    // Command succeeded — clear pending, car wins on next poll
+    delete state.pending[matchedKey];
+    state.error = null;
+    emitIfChanged();
+  }
+
+  function previousForKey(key) {
+    // Starts undefined on purpose: a failed command whose previous value is
+    // unknown must NOT overwrite the current value with null — the car wins
+    // on the next poll instead. (flush() has already emptied the queue by
+    // the time a command response arrives, so this lookup usually misses.)
+    var found;
+    Object.keys(queue).forEach(function (qk) {
+      var e = queue[qk];
+      if (e && e.previous && Object.prototype.hasOwnProperty.call(e.previous, key)) {
+        found = e.previous[key];
+      }
+    });
+    return found;
+  }
+
   // `keepAvailable` is for a rejected command: one bad call must not black out
   // controls whose state we already know.
   function refresh(keepAvailable) {
-    var result = bridge.command({ cmd: 'climate_get_state' });
-    if (!result || result.success === false) {
+    // One poll in flight at a time: its answer lands in handleCarResponse()
+    // by requestId. Re-issuing while a poll is pending would only pile up
+    // duplicate requests in the host queue.
+    if (pollPending) return true;
+    pollRequestId += 1;
+    var requestId = 'climate-poll-' + pollRequestId;
+    currentPollRequestId = requestId;
+    pollPending = true;
+    var result = bridge.requestCarCommandAsync(requestId, { cmd: 'climate_get_state' });
+    if (!result.ok) {
+      pollPending = false;
+      currentPollRequestId = null;
       if (!keepAvailable) state.available = false;
       state.error = result && result.error ? String(result.error) : 'unavailable';
       emitIfChanged();
       return false;
     }
-    apply(result);
-    emitIfChanged();
+    // JS-side timeout: if the host never answers, stop waiting so the next
+    // poll can go out. Until the first successful read the widget stays
+    // "unavailable" instead of showing invented defaults.
+    setTimeout(function () {
+      if (pollPending && currentPollRequestId === requestId) {
+        pollPending = false;
+        currentPollRequestId = null;
+        if (!state.available) {
+          state.error = 'poll_timeout';
+          emitIfChanged();
+        }
+      }
+    }, POLL_TIMEOUT_MS);
     return true;
   }
 
@@ -146,6 +245,7 @@
   }
 
   function sendNow(cmd, payload, pendingKeys, previous) {
+    var requestId = 'climate-cmd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
     pendingKeys.forEach(function (key) {
       // The caller already moved state[key] to the requested value.
       var entry = state.pending[key];
@@ -153,22 +253,25 @@
       entry.value = state[key];
       entry.at = Date.now();
       entry.queued = false;
+      entry.requestId = requestId;
     });
     emitIfChanged();
 
+    // Non-blocking async command — response arrives via carResponse → handleCarResponse().
+    // Does not block the WebView UI thread on a slow ГУ.
     var message = { cmd: cmd };
     Object.keys(payload || {}).forEach(function (key) { message[key] = payload[key]; });
-    var result = bridge.command(message);
-    var ok = !!result && result.success !== false;
+    var accepted = bridge.requestCarCommandAsync(requestId, JSON.stringify(message));
+    var ok = !!accepted;
 
     bus.emit('climate:command', {
       cmd: cmd,
       ok: ok,
-      error: ok ? null : (result && result.error ? String(result.error) : 'failed')
+      error: ok ? null : 'queue_failed'
     });
 
     if (!ok) {
-      state.error = result && result.error ? String(result.error) : 'failed';
+      state.error = 'command queue failed';
       pendingKeys.forEach(function (key) {
         delete state.pending[key];
         if (previous && Object.prototype.hasOwnProperty.call(previous, key)) {
@@ -338,6 +441,14 @@
       ['fanSpeed'], previous);
   }
 
+  function fanUp() {
+    return setFanSpeed(1);
+  }
+
+  function fanDown() {
+    return setFanSpeed(-1);
+  }
+
   function stop() {
     if (timer) {
       clearInterval(timer);
@@ -347,11 +458,16 @@
       clearTimeout(refreshTimer);
       refreshTimer = null;
     }
+    // A hidden panel must not leave a poll in flight: the guard in refresh()
+    // would otherwise skip the first poll after the panel returns.
+    pollPending = false;
+    currentPollRequestId = null;
   }
 
   function start() {
     stop();
     if (demandCount <= 0 || document.hidden) return;
+    refresh();
     timer = setInterval(refresh, POLL_MS);
   }
 
@@ -367,6 +483,7 @@
   }
 
   function init() {
+    bus.on('android:carResponse', handleCarResponse);
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) stop();
       else start();
@@ -381,6 +498,8 @@
     toggle: toggle,
     setTemperature: setTemperature,
     setFanSpeed: setFanSpeed,
+    fanUp: fanUp,
+    fanDown: fanDown,
     setSeatHeat: setSeatHeat,
     setSeatVent: setSeatVent,
     flush: flush

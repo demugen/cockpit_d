@@ -12,7 +12,10 @@
 }
 
 .clock-time {
-  font-size: clamp(28px, calc(min(calc(var(--ch) * 0.34), calc(var(--cw) * 0.3)) * var(--font-scale)), 120px);
+  /* The inner bound is the size the tile had before; the outer one only closes
+     the scale, because a clipped digit is a wrong time: the drawn "hh:mm" is
+     2.4em wide and the text gets about 0.91 of the card. */
+  font-size: min(calc(clamp(28px, calc(min(calc(var(--ch) * 0.34), calc(var(--cw) * 0.3))), 120px) * var(--font-scale)), calc(var(--cw) * 0.37));
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -28,13 +31,14 @@
 }
 
 /* "00:00:00" is two characters wider than "00:00": a 1x1 tile with seconds
-   needs a smaller face to keep all eight digits inside the card. */
+   needs a smaller face to keep all eight digits inside the card. Measured ink
+   is 3.65em, so the width bound again sits outside the scale. */
 .w-clock[data-w="1"].is-seconds .clock-time {
-  font-size: clamp(18px, calc(var(--cw) * 0.2), 64px);
+  font-size: min(calc(clamp(18px, calc(var(--cw) * 0.2), 64px) * var(--font-scale)), calc(var(--cw) * 0.24));
 }
 
 .clock-date {
-  font-size: clamp(11px, calc(var(--ch) * 0.13 * var(--font-scale)), 36px);
+  font-size: calc(clamp(11px, calc(var(--ch) * 0.13), 36px) * var(--font-scale));
   color: var(--muted);
   line-height: 1.2;
   white-space: nowrap;
@@ -60,7 +64,7 @@
 }
 
 .weather-city {
-  font-size: clamp(11px, calc(var(--ch) * 0.1 * var(--font-scale)), 28px);
+  font-size: calc(clamp(11px, calc(var(--ch) * 0.1), 28px) * var(--font-scale));
   font-weight: 500;
   letter-spacing: 0.015em;
   color: var(--muted);
@@ -107,7 +111,7 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: calc(var(--ch) * 0.32);
+  width: calc(var(--ch) * 0.32 * var(--font-scale));
   color: var(--accent);
 }
 
@@ -130,7 +134,7 @@
 }
 
 .weather-temp {
-  font-size: clamp(22px, calc(var(--ch) * 0.32 * var(--font-scale)), 110px);
+  font-size: calc(clamp(22px, calc(var(--ch) * 0.32), 110px) * var(--font-scale));
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -141,7 +145,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  font-size: clamp(11px, calc(var(--ch) * 0.11 * var(--font-scale)), 30px);
+  font-size: calc(clamp(11px, calc(var(--ch) * 0.11), 30px) * var(--font-scale));
   color: var(--muted);
   line-height: 1.2;
   overflow: hidden;
@@ -163,7 +167,7 @@
 }
 
 .w-media:not([data-h="1"]) {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto auto;
   grid-template-areas:
     "art info"
@@ -185,11 +189,26 @@
   overflow: hidden;
 }
 
+/* The cover is a square, so one side has to come from the row height: sizing it
+   from the column width instead let it grow past the volume strip below. The
+   second bound is the one that matters — the square may never take more than
+   about half the card, otherwise the title column collapses (measured: a 2x2
+   portrait card gave the text 9 % of the width). It stays put when the font
+   grows: a cover is not text. */
 .w-media:not([data-h="1"]) .media-art {
-  width: 100%;
-  height: auto;
+  width: auto;
+  height: min(100%, calc(var(--cw) * 0.6));
   aspect-ratio: 1;
   align-self: center;
+  justify-self: start;
+}
+
+/* A two-column card is the portrait default and the narrowest case: there the
+   row height, not the cap above, decides the cover size, and the text column
+   still collapses to a third of the card. Only these cards trade the cover
+   down further. */
+.w-media[data-w="2"]:not([data-h="1"]) .media-art {
+  height: min(100%, calc(var(--cw) * 0.45));
 }
 
 /* 2x1 is the smallest portrait media card: one compact row with a small
@@ -246,7 +265,7 @@
 }
 
 .media-title {
-  font-size: clamp(14px, calc(min(calc(var(--ch) * 0.12), calc(var(--cw) * 0.068)) * var(--font-scale)), 46px);
+  font-size: calc(clamp(14px, calc(min(calc(var(--ch) * 0.12), calc(var(--cw) * 0.068))), 46px) * var(--font-scale));
   font-weight: 600;
   line-height: 1.15;
   white-space: nowrap;
@@ -255,7 +274,7 @@
 }
 
 .media-artist {
-  font-size: clamp(11px, calc(min(calc(var(--ch) * 0.085), calc(var(--cw) * 0.05)) * var(--font-scale)), 38px);
+  font-size: calc(clamp(11px, calc(min(calc(var(--ch) * 0.085), calc(var(--cw) * 0.05))), 38px) * var(--font-scale));
   color: var(--muted);
   line-height: 1.2;
   white-space: nowrap;
@@ -264,7 +283,7 @@
 }
 
 .media-meta {
-  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038)) * var(--font-scale)), 28px);
+  font-size: calc(clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038))), 28px) * var(--font-scale));
   color: var(--faint);
   line-height: 1.2;
   white-space: nowrap;
@@ -291,7 +310,7 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038)) * var(--font-scale)), 28px);
+  font-size: calc(clamp(10px, calc(min(calc(var(--ch) * 0.065), calc(var(--cw) * 0.038))), 28px) * var(--font-scale));
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
@@ -371,7 +390,7 @@
 }
 
 .media-volume-icon .icon {
-  width: clamp(15px, calc(var(--ch) * 0.08), 24px);
+  width: calc(clamp(15px, calc(var(--ch) * 0.08), 24px) * var(--font-scale));
   height: auto;
 }
 
@@ -391,11 +410,33 @@
     var(--control-hover);
 }
 
+/* Fallback steppers: on firmwares without setvol the slider has no exact
+   target, so ±5 % taps stay usable with a glove on. */
+.media-vol-step {
+  --vol-step: calc(clamp(26px, calc(var(--ch) * 0.14), 44px) * var(--font-scale));
+  flex: none;
+  width: var(--vol-step);
+  height: var(--vol-step);
+  border-radius: 10px;
+  background: var(--control);
+  color: var(--muted);
+}
+
+.media-vol-step .icon {
+  width: 58%;
+  height: 58%;
+}
+
+.media-vol-step:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+
 .media-vol-value {
   flex: none;
   min-width: 3ch;
   text-align: right;
-  font-size: clamp(10px, calc(var(--ch) * 0.065 * var(--font-scale)), 22px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.065), 22px) * var(--font-scale));
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -447,7 +488,9 @@
   margin: 0;
   padding: 0;
   background: transparent;
-  touch-action: none;
+  /* pan-x, not none: body sets touch-action:none for the kiosk, and a value of
+     "none" makes Chromium refuse to drag this slider with a finger. */
+  touch-action: pan-x;
   cursor: pointer;
 }
 
@@ -512,7 +555,7 @@
 
 .cl-label {
   flex: none;
-  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.075), 24px) * var(--font-scale));
   letter-spacing: 0.02em;
   color: var(--muted);
   white-space: nowrap;
@@ -556,9 +599,10 @@
   justify-content: center;
   gap: 4px;
   min-width: 0;
-  font-size: clamp(20px, calc(var(--ch) * 0.14 * var(--font-scale)), 82px);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  /* Sensor readouts have free horizontal space, so values can be larger. */
+  font-size: min(calc(clamp(24px, calc(var(--ch) * 0.18), 100px) * var(--font-scale)), calc(var(--cw) * 0.2));
+  font-weight: 700;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
@@ -597,7 +641,10 @@
 }
 
 .cl-toggle-text {
-  font-size: clamp(9px, calc(var(--ch) * 0.065 * var(--font-scale)), 20px);
+  /* The toggle row is width-bound: five labels share the card. Capping the
+     label by the card width, after the font scale, is what keeps the last one
+     from being cut off at the edge. */
+  font-size: min(calc(clamp(9px, calc(var(--ch) * 0.065), 20px) * var(--font-scale)), calc(var(--cw) * 0.045));
   font-weight: 600;
   letter-spacing: 0.05em;
 }
@@ -620,7 +667,7 @@
 .cl-note {
   flex: none;
   text-align: center;
-  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.06), 16px) * var(--font-scale));
   color: var(--danger);
 }
 
@@ -701,22 +748,36 @@
 }
 
 .seat-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(3px, calc(var(--ch) * 0.014), 8px);
+  gap: clamp(4px, calc(var(--ch) * 0.02), 9px);
   flex: 1;
   width: 100%;
   min-width: 0;
   min-height: 0;
   padding: clamp(4px, calc(var(--ch) * 0.018), 10px);
+  /* The level gauge rides the right edge outside the flow, so the side that has
+     one pays for it in padding and the caption can never slide under it. The
+     rail is sized from the shorter edge of the button, because its steps are
+     near-square and a tall card has to show a taller gauge, not a floating dot. */
+  --seat-rail: clamp(8px, calc(min(var(--cw), var(--ch)) * 0.036), 14px);
+  --seat-rail-gap: clamp(4px, calc(var(--cw) * 0.014), 8px);
+  padding-right: calc(
+    clamp(4px, calc(var(--ch) * 0.018), 10px) + var(--seat-rail-take, 0px));
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
   text-align: center;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.seat-btn--heat,
+.seat-btn--vent {
+  --seat-rail-take: calc(var(--seat-rail) + var(--seat-rail-gap) * 2);
 }
 
 .seat-btn:hover:not(:disabled) {
@@ -730,7 +791,9 @@
 
 .seat-btn-icon {
   flex: none;
-  width: clamp(20px, calc(var(--ch) * 0.1), 40px);
+  /* Size against the cell, not the whole card: a 2x2 card splits its height
+     into two rows, and an icon tied to --ch stays a small dot in a tall cell. */
+  width: clamp(20px, calc(var(--ch) / var(--seat-rows, 2) * 0.26), 44px);
   aspect-ratio: 1;
   background: currentColor;
   -webkit-mask: center / contain no-repeat;
@@ -759,7 +822,27 @@
   mask-image: url('../assets/icons/seat-vent-right.svg');
 }
 
+/* Heater toggles (glass, rear window, steering wheel) — warn color when on */
+.seat-btn-icon--heater.seat-btn-icon--glass {
+  -webkit-mask-image: url('../assets/icons/glass-heat.svg');
+  mask-image: url('../assets/icons/glass-heat.svg');
+}
+
+.seat-btn-icon--heater.seat-btn-icon--rear {
+  -webkit-mask-image: url('../assets/icons/rear-window.svg');
+  mask-image: url('../assets/icons/rear-window.svg');
+}
+
+.seat-btn-icon--heater.seat-btn-icon--wheel {
+  -webkit-mask-image: url('../assets/icons/steering-wheel-heat.svg');
+  mask-image: url('../assets/icons/steering-wheel-heat.svg');
+}
+
 .seat-btn--heat[aria-pressed="true"] .seat-btn-icon {
+  color: var(--warn);
+}
+
+.seat-btn--heater[aria-pressed="true"] .seat-btn-icon {
   color: var(--warn);
 }
 
@@ -774,12 +857,17 @@
   gap: 1px;
   min-width: 0;
   max-width: 100%;
+  /* Same family as the heater buttons: a seat caption is a control label, not a
+     footnote. The size is set on the block so the sub-caption can be tied to it
+     in em, and the width bound is written against the cell rather than the card
+     because the widget splits a tile into up to four columns and a Cyrillic seat
+     name is seven times its own font size. */
+  font-size: min(calc(clamp(11px, calc(var(--ch) * 0.07), 20px) * var(--font-scale)), max(9px, calc(var(--cw) * var(--seat-cell, 0.5) * 0.16 - 4px)));
 }
 
 .seat-btn-label {
   max-width: 100%;
   min-width: 0;
-  font-size: clamp(10px, calc(var(--ch) * 0.04 * var(--font-scale)), 15px);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -789,7 +877,7 @@
 .seat-btn-kind {
   max-width: 100%;
   min-width: 0;
-  font-size: clamp(8px, calc(var(--ch) * 0.03 * var(--font-scale)), 12px);
+  font-size: min(0.9em, max(8px, calc(var(--cw) * var(--seat-cell, 0.5) * 0.16 - 5px)));
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -814,13 +902,22 @@
   color: var(--accent);
 }
 
+/* A vertical gauge, pinned to the right edge and read from the bottom up: the
+   height follows the rail width, so every step is a near-square block instead of
+   a stretched capsule, and the whole thing stays inside the button at any tile
+   size. */
 .seat-btn-levels {
+  position: absolute;
+  right: var(--seat-rail-gap);
+  top: 50%;
+  transform: translateY(-50%);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(2px, calc(var(--cw) * 0.006), 4px);
+  grid-template-rows: repeat(var(--seat-levels, 3), minmax(0, 1fr));
+  gap: clamp(3px, calc(var(--ch) * 0.014), 6px);
   flex: none;
-  width: clamp(38px, calc(var(--ch) * 0.18), 72px);
-  height: clamp(6px, calc(var(--ch) * 0.024), 11px);
+  width: var(--seat-rail);
+  height: calc(var(--seat-rail) * var(--seat-levels, 3) + clamp(3px, calc(var(--ch) * 0.014), 6px) * 2);
+  max-height: calc(100% - var(--seat-rail-gap) * 2);
 }
 
 .seat-btn-levels i {
@@ -851,170 +948,41 @@
   flex-direction: row;
   justify-content: flex-start;
   gap: clamp(4px, calc(var(--cw) * 0.014), 6px);
-  padding: 0 clamp(5px, calc(var(--cw) * 0.02), 8px);
+  padding: 0 calc(clamp(5px, calc(var(--cw) * 0.02), 8px) + var(--seat-rail-take, 0px)) 0
+    clamp(5px, calc(var(--cw) * 0.02), 8px);
   text-align: left;
 }
 
 .w-seats[data-h="1"] .seat-btn-icon {
-  width: clamp(14px, calc(var(--ch) * 0.13), 22px);
+  width: clamp(16px, calc(var(--ch) * 0.16), 24px);
 }
 
 .w-seats[data-h="1"] .seat-btn-glyph {
-  width: clamp(14px, calc(var(--ch) * 0.13), 22px);
+  width: clamp(16px, calc(var(--ch) * 0.16), 24px);
+}
+
+/* The inline row of a one-tile-high card splits a tile into up to four columns,
+   so the caption has to share its cell with the icon and the gauge rail. Past
+   the bound it stops growing instead of becoming "Заднее п…", and the sub-caption
+   follows through 0.9em. */
+.w-seats[data-h="1"] .seat-btn-text {
+  flex: 1;
+  align-items: flex-start;
+  font-size: min(calc(clamp(11px, calc(var(--ch) * 0.07), 20px) * var(--font-scale)), max(9px, calc(var(--cw) * var(--seat-cell, 0.5) * 0.085)));
 }
 
 .w-seats[data-h="1"] .seat-btn-label {
   flex: none;
-  font-size: clamp(9px, calc(var(--cw) * 0.03 * var(--font-scale)), 13px);
-}
-
-.w-seats[data-h="1"] .seat-btn-text {
-  flex: 1;
-  align-items: flex-start;
-}
-
-.w-seats[data-h="1"] .seat-btn-kind {
-  font-size: clamp(8px, calc(var(--cw) * 0.026 * var(--font-scale)), 11px);
-}
-
-.w-seats[data-h="1"] .seat-btn-levels {
-  width: clamp(26px, calc(var(--cw) * 0.09), 38px);
-  height: clamp(5px, calc(var(--ch) * 0.028), 8px);
 }
 
 .seat-note {
   flex: none;
   text-align: center;
-  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.06), 16px) * var(--font-scale));
   color: var(--danger);
 }
 
 .w-seats.is-unavailable .seats-grid {
-  opacity: 0.45;
-}
-
-/* ---------- heaters ---------- */
-
-.w-heaters {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--ch) * 0.025);
-  min-height: 0;
-}
-
-/* Same mechanics as the seats: one compact row button per function. Glass
-   and steering heat only know on/off, so the row ends with a single state
-   pill instead of a three-step meter. */
-.heat-grid {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(5px, calc(var(--ch) * 0.028), 12px);
-  flex: 1;
-  min-height: 0;
-}
-
-.heat-btn {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: clamp(8px, calc(var(--cw) * 0.024), 16px);
-  flex: 0 1 auto;
-  height: clamp(38px, calc(var(--ch) * 0.29), 68px);
-  min-width: 0;
-  min-height: 0;
-  padding: 0 clamp(10px, calc(var(--cw) * 0.03), 18px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: var(--text);
-  text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.heat-btn:hover:not(:disabled) {
-  background: var(--control-hover);
-  border-color: var(--line-strong);
-}
-
-.heat-btn:disabled {
-  opacity: 0.45;
-}
-
-.heat-btn-icon {
-  flex: none;
-  width: clamp(18px, calc(var(--ch) * 0.14), 30px);
-  aspect-ratio: 1;
-  background: currentColor;
-  -webkit-mask: center / contain no-repeat;
-  mask: center / contain no-repeat;
-  color: var(--muted);
-  transition: color 0.15s ease;
-}
-
-.heat-btn-icon--glass {
-  -webkit-mask-image: url('../assets/icons/glass-heat.svg');
-  mask-image: url('../assets/icons/glass-heat.svg');
-}
-
-.heat-btn-icon--rear {
-  -webkit-mask-image: url('../assets/icons/rear-window.svg');
-  mask-image: url('../assets/icons/rear-window.svg');
-}
-
-.heat-btn-icon--wheel {
-  -webkit-mask-image: url('../assets/icons/steering-wheel-heat.svg');
-  mask-image: url('../assets/icons/steering-wheel-heat.svg');
-}
-
-.heat-btn[aria-pressed="true"] {
-  background: var(--control-hover);
-  border-color: var(--line-strong);
-}
-
-.heat-btn[aria-pressed="true"] .heat-btn-icon {
-  color: var(--warn);
-}
-
-.heat-btn-label {
-  flex: 1 1 auto;
-  max-width: 100%;
-  min-width: 0;
-  font-size: clamp(11px, calc(var(--ch) * 0.07 * var(--font-scale)), 20px);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.heat-btn-meter {
-  flex: none;
-  width: clamp(26px, calc(var(--cw) * 0.09), 38px);
-  height: clamp(5px, calc(var(--ch) * 0.028), 8px);
-  border-radius: 999px;
-  background: var(--faint);
-  opacity: 0.55;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-
-.heat-btn[aria-pressed="true"] .heat-btn-meter {
-  background: var(--warn);
-  opacity: 1;
-}
-
-.heat-btn.is-pending {
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.heat-note {
-  flex: none;
-  text-align: center;
-  font-size: clamp(10px, calc(var(--ch) * 0.06), 16px);
-  color: var(--danger);
-}
-
-.w-heaters.is-unavailable .heat-grid {
   opacity: 0.45;
 }
 
@@ -1047,7 +1015,7 @@
 
 .win-title {
   flex: none;
-  font-size: clamp(9px, calc(var(--ch) * 0.045 * var(--font-scale)), 15px);
+  font-size: calc(clamp(9px, calc(var(--ch) * 0.045), 15px) * var(--font-scale));
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1057,7 +1025,7 @@
 
 .win-hint {
   min-width: 0;
-  font-size: clamp(9px, calc(var(--ch) * 0.04 * var(--font-scale)), 13px);
+  font-size: calc(clamp(9px, calc(var(--ch) * 0.04), 13px) * var(--font-scale));
   color: var(--faint);
   white-space: nowrap;
   overflow: hidden;
@@ -1072,42 +1040,8 @@
   min-height: 0;
 }
 
-.win-slider-row {
-  display: flex;
-  align-items: center;
-  gap: clamp(5px, calc(var(--cw) * 0.012), 10px);
-  flex: 1;
-  min-height: 0;
-  padding: 0 clamp(2px, calc(var(--cw) * 0.006), 6px);
-}
-
-.win-slider-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  color: var(--muted);
-}
-
-.win-slider-icon .icon {
-  width: clamp(16px, calc(var(--ch) * 0.09), 30px);
-  height: auto;
-}
-
-.win-slider {
-  flex: 1 1 auto;
-  min-width: 0;
-  --range-track: clamp(6px, calc(var(--ch) * 0.04), 14px);
-  --range-thumb: clamp(18px, calc(var(--ch) * 0.11), 32px);
-}
-
-.win-slider-value {
-  flex: none;
-  min-width: 5.5ch;
-  text-align: right;
-  font-size: clamp(9px, calc(var(--cw) * 0.028 * var(--font-scale)), 15px);
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.win-row--all {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .win-btn {
@@ -1147,8 +1081,20 @@
 .win-btn-label {
   max-width: 100%;
   min-width: 0;
-  font-size: clamp(9px, calc(var(--cw) * 0.028 * var(--font-scale)), 14px);
+  /* The cap is the button, not the clamp: at 1.3 a bound inside calc() grows
+     past the cell and the caption goes under an ellipsis. */
+  font-size: min(calc(clamp(9px, calc(var(--cw) * 0.028), 14px) * var(--font-scale)), calc(var(--cw) * 0.052));
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-btn-percent {
+  max-width: 100%;
+  font-size: min(calc(clamp(9px, calc(var(--cw) * 0.024), 13px) * var(--font-scale)), calc(var(--cw) * 0.044));
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1168,7 +1114,7 @@
   flex: none;
   min-width: 0;
   text-align: center;
-  font-size: clamp(9px, calc(var(--ch) * 0.055 * var(--font-scale)), 14px);
+  font-size: calc(clamp(9px, calc(var(--ch) * 0.055), 14px) * var(--font-scale));
   color: var(--faint);
   white-space: nowrap;
   overflow: hidden;
@@ -1200,16 +1146,12 @@
 }
 
 .w-windows[data-h="1"] .win-btn-label {
-  font-size: clamp(8px, calc(var(--cw) * 0.024 * var(--font-scale)), 12px);
+  font-size: calc(clamp(8px, calc(var(--cw) * 0.024), 12px) * var(--font-scale));
 }
 
-.w-windows[data-h="1"] .win-slider-icon {
+/* The position needs a line of its own, which a one-row card does not have. */
+.w-windows[data-h="1"] .win-btn-percent {
   display: none;
-}
-
-.w-windows[data-h="1"] .win-slider-value {
-  min-width: 0;
-  font-size: clamp(8px, calc(var(--cw) * 0.024 * var(--font-scale)), 12px);
 }
 
 /* ---------- apps ---------- */
@@ -1264,7 +1206,7 @@
 }
 
 .app-letter {
-  font-size: clamp(12px, calc(var(--ch) / var(--app-rows, 1) * 0.3), 40px);
+  font-size: calc(clamp(12px, calc(var(--ch) / var(--app-rows, 1) * 0.3), 40px) * var(--font-scale));
   font-weight: 600;
   color: var(--accent);
 }
@@ -1278,7 +1220,7 @@
 
 .app-name {
   max-width: 100%;
-  font-size: clamp(9px, calc(var(--ch) / var(--app-rows, 1) * 0.1 * var(--font-scale)), 16px);
+  font-size: calc(clamp(9px, calc(var(--ch) / var(--app-rows, 1) * 0.1), 16px) * var(--font-scale));
   line-height: 1.2;
   color: var(--muted);
   text-align: center;
@@ -1298,13 +1240,13 @@
 }
 
 .apps-empty-text {
-  font-size: clamp(11px, calc(var(--cw) * 0.042 * var(--font-scale)), 20px);
+  font-size: calc(clamp(11px, calc(var(--cw) * 0.042), 20px) * var(--font-scale));
   color: var(--muted);
 }
 
 .apps-empty .btn {
   min-height: 36px;
-  font-size: clamp(11px, calc(var(--cw) * 0.034), 14px);
+  font-size: calc(clamp(11px, calc(var(--cw) * 0.034), 14px) * var(--font-scale));
 }
 
 /* ---------- car data ---------- */
@@ -1350,7 +1292,7 @@
 }
 
 .car-label {
-  font-size: clamp(10px, calc(min(calc(var(--ch) * 0.075), calc(var(--cw) * 0.04)) * var(--font-scale)), 22px);
+  font-size: calc(clamp(10px, calc(min(calc(var(--ch) * 0.075), calc(var(--cw) * 0.04))), 22px) * var(--font-scale));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1365,16 +1307,16 @@
 }
 
 .car-value {
-  font-size: clamp(20px, calc(min(calc(var(--ch) * 0.19), calc(var(--cw) * 0.12)) * var(--font-scale)), 92px);
-  font-weight: 600;
+  font-size: calc(clamp(24px, calc(min(calc(var(--ch) * 0.24), calc(var(--cw) * 0.16))), 110px) * var(--font-scale));
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .car-unit {
-  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.075), 24px) * var(--font-scale));
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1388,7 +1330,7 @@
 }
 
 .car-sub-value {
-  font-size: clamp(20px, calc(min(calc(var(--ch) * 0.19), calc(var(--cw) * 0.12)) * var(--font-scale)), 92px);
+  font-size: calc(clamp(20px, calc(min(calc(var(--ch) * 0.19), calc(var(--cw) * 0.12))), 92px) * var(--font-scale));
   font-weight: 500;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -1396,7 +1338,7 @@
 }
 
 .car-sub-unit {
-  font-size: clamp(10px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.075), 24px) * var(--font-scale));
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1413,7 +1355,7 @@
   margin: auto;
   padding: 8px;
   text-align: center;
-  font-size: clamp(11px, calc(var(--cw) * 0.042), 18px);
+  font-size: calc(clamp(11px, calc(var(--cw) * 0.042), 18px) * var(--font-scale));
   color: var(--muted);
 }
 
@@ -1462,8 +1404,32 @@
 }
 
 .nav-map-note {
-  font-size: clamp(10px, calc(var(--ch) * 0.07 * var(--font-scale)), 15px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.07), 15px) * var(--font-scale));
   color: var(--muted);
+}
+
+.nav-map-retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(26px, calc(var(--ch) * 0.15), 40px);
+  padding: 0 clamp(9px, calc(var(--ch) * 0.055), 15px);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.055), 14px) * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nav-map-retry:hover {
+  background: var(--control-hover);
+}
+
+:root[data-theme="light"] .nav-map-retry {
+  color: var(--accent);
 }
 
 .nav-map {
@@ -1539,8 +1505,8 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: clamp(26px, calc(var(--ch) * 0.17), 60px);
-  height: clamp(26px, calc(var(--ch) * 0.17), 60px);
+  width: calc(clamp(26px, calc(var(--ch) * 0.17), 60px) * var(--font-scale));
+  height: calc(clamp(26px, calc(var(--ch) * 0.17), 60px) * var(--font-scale));
   color: var(--accent-bright);
 }
 
@@ -1550,7 +1516,7 @@
 }
 
 .nav-turn-dist {
-  font-size: clamp(18px, calc(var(--ch) * 0.12 * var(--font-scale)), 48px);
+  font-size: calc(clamp(18px, calc(var(--ch) * 0.12), 48px) * var(--font-scale));
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -1569,17 +1535,18 @@
 .nav-speed {
   display: grid;
   place-items: center;
-  width: clamp(30px, calc(var(--ch) * 0.2), 68px);
+  width: clamp(30px, calc(var(--ch) * 0.2), 88px);
   height: clamp(30px, calc(var(--ch) * 0.2), 68px);
   border-radius: 50%;
   border: clamp(3px, calc(var(--ch) * 0.026), 6px) solid #e03434;
   background: #ffffff;
   color: #15181d;
-  font-size: clamp(13px, calc(var(--ch) * 0.1 * var(--font-scale)), 30px);
+  font-size: calc(clamp(13px, calc(var(--ch) * 0.1), 30px) * var(--font-scale));
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   box-shadow: var(--shadow-soft);
+  white-space: nowrap;
 }
 
 .nav-gps {
@@ -1635,7 +1602,7 @@
 }
 
 .nav-road-name {
-  font-size: clamp(11px, calc(var(--ch) * 0.075 * var(--font-scale)), 24px);
+  font-size: calc(clamp(11px, calc(var(--ch) * 0.075), 24px) * var(--font-scale));
   font-weight: 500;
   color: #ffffff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
@@ -1657,7 +1624,7 @@
 }
 
 .nav-remain-label {
-  font-size: clamp(8px, calc(var(--ch) * 0.05 * var(--font-scale)), 12px);
+  font-size: calc(clamp(8px, calc(var(--ch) * 0.05), 12px) * var(--font-scale));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.72);
@@ -1668,7 +1635,7 @@
 }
 
 .nav-remain-value {
-  font-size: clamp(12px, calc(var(--ch) * 0.085 * var(--font-scale)), 26px);
+  font-size: calc(clamp(12px, calc(var(--ch) * 0.085), 26px) * var(--font-scale));
   font-weight: 600;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
@@ -1686,17 +1653,31 @@
   justify-content: center;
   gap: 6px;
   flex: none;
-  height: clamp(28px, calc(var(--ch) * 0.17), 44px);
-  padding: 0 clamp(9px, calc(var(--ch) * 0.06), 16px);
+  min-width: 0;
+  height: calc(clamp(28px, calc(var(--ch) * 0.17), 44px) * var(--font-scale));
+  padding: 0 calc(clamp(9px, calc(var(--ch) * 0.06), 16px) * var(--font-scale));
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: clamp(10px, calc(var(--ch) * 0.055 * var(--font-scale)), 14px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.055), 14px) * var(--font-scale));
   font-weight: 600;
   white-space: nowrap;
   pointer-events: auto;
   box-shadow: var(--shadow-soft);
   transition: background 0.15s ease;
+}
+
+/* The route footer shares one line with the distance and the road name. On a
+   narrow card the launch button must give way instead of sticking out of the
+   stage, where overflow would cut its caption mid-word. */
+.nav-open {
+  flex: 0 1 auto;
+}
+
+.nav-open .nav-launch-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-open:hover,
@@ -1713,8 +1694,55 @@
 
 .nav-open .icon,
 .nav-launch .icon {
-  width: clamp(13px, calc(var(--ch) * 0.08), 18px);
-  height: clamp(13px, calc(var(--ch) * 0.08), 18px);
+  width: calc(clamp(13px, calc(var(--ch) * 0.08), 18px) * var(--font-scale));
+  height: calc(clamp(13px, calc(var(--ch) * 0.08), 18px) * var(--font-scale));
+}
+
+/* Map-only mode: a live stream without HUD route data keeps the map clear and
+   offers one compact way back to the navigator instead of the idle card. */
+.nav-map-open {
+  position: absolute;
+  left: clamp(6px, calc(min(var(--cw), var(--ch)) * 0.05), 16px);
+  bottom: clamp(6px, calc(min(var(--cw), var(--ch)) * 0.05), 16px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: clamp(24px, calc(var(--ch) * 0.15), 36px);
+  padding: 0 clamp(8px, calc(var(--ch) * 0.05), 13px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(9, 14, 21, 0.72);
+  color: #ffffff;
+  font-size: calc(clamp(9px, calc(var(--ch) * 0.05), 13px) * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.nav-map-open .icon {
+  width: calc(clamp(12px, calc(var(--ch) * 0.07), 16px) * var(--font-scale));
+  height: calc(clamp(12px, calc(var(--ch) * 0.07), 16px) * var(--font-scale));
+}
+
+:root[data-theme="light"] .nav-map-open {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+#board.is-editing .nav-map-open {
+  pointer-events: none;
+}
+
+.w-nav[data-h="1"] .nav-map-open {
+  width: clamp(24px, calc(var(--ch) * 0.15), 36px);
+  padding: 0;
+  justify-content: center;
+}
+
+.w-nav[data-h="1"] .nav-map-open .nav-launch-label {
+  display: none;
 }
 
 .nav-idle {
@@ -1743,19 +1771,19 @@
 }
 
 .nav-idle-icon .icon {
-  width: clamp(22px, calc(min(var(--cw), var(--ch)) * 0.16), 44px);
+  width: calc(clamp(22px, calc(min(var(--cw), var(--ch)) * 0.16), 44px) * var(--font-scale));
   height: auto;
 }
 
 .nav-idle-title {
-  font-size: clamp(13px, calc(var(--ch) * 0.09 * var(--font-scale)), 24px);
+  font-size: calc(clamp(13px, calc(var(--ch) * 0.09), 24px) * var(--font-scale));
   font-weight: 600;
   color: var(--text);
 }
 
 .nav-idle-hint {
   max-width: 92%;
-  font-size: clamp(10px, calc(var(--ch) * 0.065 * var(--font-scale)), 16px);
+  font-size: calc(clamp(10px, calc(var(--ch) * 0.065), 16px) * var(--font-scale));
   line-height: 1.3;
   color: var(--muted);
 }
@@ -1796,5 +1824,72 @@
 }
 
 .w-nav[data-h="1"] .nav-idle-title {
-  font-size: clamp(12px, calc(var(--ch) * 0.1 * var(--font-scale)), 20px);
+  font-size: calc(clamp(12px, calc(var(--ch) * 0.1), 20px) * var(--font-scale));
+}
+
+/* ---------- touch targets ---------- */
+
+/* The visible control stays compact; a transparent pseudo-element guarantees
+   a finger-sized tappable area around it. Sizes are bounded by the nearest
+   neighbour: media steps keep 38 px so the volume slider does not lose its
+   first pixels, the rest get the full 44. */
+.cl-step,
+.media-vol-step,
+.weather-refresh,
+.nav-open,
+.nav-launch,
+.nav-map-retry,
+.btn,
+.btn-x {
+  position: relative;
+}
+
+.cl-step::after,
+.weather-refresh::after,
+.nav-open::after,
+.nav-launch::after,
+.nav-map-open::after,
+.nav-map-retry::after,
+.btn-x::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.media-vol-step::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+}
+
+.cl-toggle::after,
+.btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+.cl-toggle {
+  position: relative;
+}
+
+/* Respect prefers-reduced-motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .cl-toggle.is-pending,
+  .seat-btn.is-pending,
+    .weather-refresh.is-busy .icon {
+    animation: none !important;
+  }
 }

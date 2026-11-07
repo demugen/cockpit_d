@@ -18,6 +18,7 @@
   var VERSION = 3;
   var THEMES = ['dark', 'light', 'auto'];
   var FONT_SCALES = [0.9, 1, 1.15, 1.3];
+  var TRANSPARENCIES = [0, 20, 40, 60];
   var HEADER_SLOTS = ['left', 'center', 'right'];
   var ROTATE_MINUTES = [0, 10, 30, 60, 180];
 
@@ -39,6 +40,7 @@
       version: VERSION,
       theme: 'dark',
       fontScale: 1,
+      transparency: 0,
       header: { carChips: true, clockSlot: 'center', chipsSlot: 'left' },
       background: { image: '', rotateMinutes: 0 },
       car: { pollSeconds: 5 },
@@ -70,6 +72,20 @@
     return best;
   }
 
+  function pickTransparency(value) {
+    var number = utils.toNumber(value, 0);
+    var best = 0;
+    var distance = Infinity;
+    TRANSPARENCIES.forEach(function (level) {
+      var delta = Math.abs(level - number);
+      if (delta < distance) {
+        distance = delta;
+        best = level;
+      }
+    });
+    return best;
+  }
+
   function sanitizeLayout(layout, axis) {
     if (!layout || typeof layout !== 'object' || !layout.items || typeof layout.items !== 'object') return null;
     var clean = grid.sanitizeGrid(layout.grid, null);
@@ -93,6 +109,7 @@
 
     base.theme = pickTheme(source.theme);
     base.fontScale = pickFontScale(source.fontScale);
+    base.transparency = pickTransparency(source.transparency);
 
     var header = utils.isPlainObject(source.header) ? source.header : {};
     base.header.carChips = header.carChips !== false;
@@ -125,8 +142,29 @@
       // explicit stored choice overrides it.
       if (typeof enabled[def.id] === 'boolean') base.widgets.enabled[def.id] = enabled[def.id];
       if (utils.isPlainObject(storedSettings[def.id])) {
-        base.widgets.settings[def.id] = utils.deepMerge(base.widgets.settings[def.id], storedSettings[def.id]);
+        // Whitelist: only keys the widget still knows survive the merge, so a
+        // setting removed from the code (e.g. the retired nav.mapZoom) cannot
+        // ride along in saved state forever.
+        var defaults = base.widgets.settings[def.id];
+        var stored = storedSettings[def.id];
+        var clean = {};
+        Object.keys(stored).forEach(function (key) {
+          if (Object.prototype.hasOwnProperty.call(defaults, key)) clean[key] = stored[key];
+        });
+        base.widgets.settings[def.id] = utils.deepMerge(defaults, clean);
       }
+      // Миграция: новые настройки виджетов добавляются только если их нет в старом конфиге,
+      // существующие значения пользователя не трогаются.
+      // Ключ 'rearMaxLevel' обязан совпадать с seatCatalog.REAR_LEVELS_KEY (js/core/seat-catalog.js)
+      // и settingsDefaults виджета seats — здесь он строкой, потому что схема не зависит от каталога.
+      var widgetSettings = base.widgets.settings[def.id] || {};
+      if (def.id === 'seats' && typeof widgetSettings.rearMaxLevel !== 'number') {
+        widgetSettings.rearMaxLevel = 3;
+      }
+      if (def.id === 'nav' && typeof widgetSettings.mapTheme !== 'string') {
+        widgetSettings.mapTheme = 'auto';
+      }
+      base.widgets.settings[def.id] = widgetSettings;
     });
 
     var layouts = utils.isPlainObject(source.layouts) ? source.layouts : {};
@@ -156,7 +194,7 @@
     return list;
   }
 
-  function placeMissing(settings, axis, defs, layout) {
+  function placeMissing(settings, axis, defs, layout, activeIds) {
     var order = settings.widgets.order;
     var result = { grid: layout.grid, items: layout.items };
     defsInOrder(defs, order).forEach(function (def) {
@@ -170,24 +208,38 @@
         w: utils.clamp(raw.w, Math.min(min.w, result.grid.cols), result.grid.cols),
         h: utils.clamp(raw.h, Math.min(min.h, result.grid.rows), result.grid.rows)
       };
-      var rect = grid.placeBest(result.grid, result.items, requested, min);
+      var rect = grid.placeBest(result.grid, result.items, requested, min, { activeIds: activeIds });
       if (rect) result.items[def.id] = rect;
     });
     return result;
   }
 
-  function fitLayout(layout, axis, target, defs, order, packDefs) {
+  function fitLayout(layout, axis, target, defs, order, packDefs, activeIds) {
+    var sizes = minSizes(defs, axis);
     if (layout) {
       var remapped = grid.remap(layout, target, {
         order: order,
-        minSizes: minSizes(defs, axis)
+        minSizes: sizes,
+        activeIds: activeIds
       });
       if (remapped.ok) return { grid: target, items: remapped.items, overflow: [] };
     }
     // A viewport change re-flows the board by definition. When positions
     // cannot be kept, packing the cards in order beats refusing the switch
-    // and leaving the user on a grid they cannot leave.
-    var packed = grid.packLayout(target, packDefs || defsInOrder(defs, order), axis);
+    // and leaving the user on a grid they cannot leave. Only the cards that are
+    // on the board are packed: a switched-off one is not a candidate for a cell,
+    // it keeps its own saved cell as the memory it returns to, exactly as on the
+    // re-fit path above.
+    var toPack = activeIds
+      ? packDefs.filter(function (def) { return activeIds.indexOf(def.id) !== -1; })
+      : packDefs;
+    var packed = grid.packLayout(target, toPack, axis);
+    if (layout && activeIds) {
+      Object.keys(layout.items).forEach(function (id) {
+        if (activeIds.indexOf(id) !== -1 || packed.items[id]) return;
+        packed.items[id] = grid.keptRect(layout.items[id], target, sizes[id]);
+      });
+    }
     return { grid: packed.grid, items: packed.items, overflow: packed.overflow };
   }
 
@@ -223,8 +275,9 @@
       // longer fits is the one left out, not the last entry in the order.
       packDefs = packDefs.filter(function (def) { return def.defaultEnabled !== false; })
         .concat(packDefs.filter(function (def) { return def.defaultEnabled === false; }));
-      var layout = fitLayout(existing, axis, target, defs, next.widgets.order, packDefs);
-      next.layouts[axis] = placeMissing(next, axis, defs, { grid: layout.grid, items: layout.items });
+      var shown = enabledIds(next);
+      var layout = fitLayout(existing, axis, target, defs, next.widgets.order, packDefs, shown);
+      next.layouts[axis] = placeMissing(next, axis, defs, { grid: layout.grid, items: layout.items }, shown);
       next.layouts[axis].grid = { cols: target.cols, rows: target.rows };
     });
     return next;
@@ -250,6 +303,7 @@
     VERSION: VERSION,
     THEMES: THEMES,
     FONT_SCALES: FONT_SCALES,
+    TRANSPARENCIES: TRANSPARENCIES,
     defaults: defaults,
     normalize: normalize,
     sanitizeLayout: sanitizeLayout,

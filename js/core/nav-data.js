@@ -66,6 +66,18 @@
     return String(value).replace(/\s+/g, ' ').trim().slice(0, limit || 120);
   }
 
+  // Firmwares send the route flag as true, 1 or "true"; a strict === true
+  // leaves the map overlay off while the route is actually running.
+  function flag(value) {
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
+    if (typeof value === 'string') {
+      var normalized = value.toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
+    }
+    return false;
+  }
+
   function maneuver(code) {
     var key = integer(code, 0, 999);
     return MANEUVERS[key] || { icon: 'nav-straight', label: 'Манёвр' };
@@ -99,7 +111,7 @@
     var patch = { speedLimit: integer(data.speedLimit, 1, 300) };
     if (sender === 'ARAD') return { type: 'ARAD', patch: patch };
 
-    patch.naviOn = data.naviOn === true;
+    patch.naviOn = flag(data.naviOn);
     patch.turnType = integer(data.turnType, 0, 999);
     patch.turnDist = distance(data.turnDist);
     patch.remainDist = distance(data.remainDist);

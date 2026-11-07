@@ -5,7 +5,7 @@
   'use strict';
 
   var App = window.App || {};
-  App.version = '2.0.0';
+  App.version = '2.4.19';
   App.core = App.core || {};
   App.services = App.services || {};
   App.widgets = App.widgets || {};

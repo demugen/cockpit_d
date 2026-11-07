@@ -21,17 +21,27 @@
   var gesture = null;
   var ghost = null;
   var longPressTimer = null;
+  var longPressCancel = null;
   var suppressClick = false;
   var suppressTimer = null;
   var observer = null;
 
-  function suppressNextClick() {
+  // A gesture has to swallow the click its own pointerup synthesises. The flag
+  // belongs to that pointer sequence: the next pointerdown means the user aimed
+  // at something new, so the pending suppression is dropped there instead of
+  // waiting out the backstop timer and eating an intentional tap.
+  function suppressGestureClick() {
     suppressClick = true;
     if (suppressTimer) clearTimeout(suppressTimer);
-    suppressTimer = setTimeout(function () {
-      suppressClick = false;
+    suppressTimer = setTimeout(clearGestureClick, 600);
+  }
+
+  function clearGestureClick() {
+    suppressClick = false;
+    if (suppressTimer) {
+      clearTimeout(suppressTimer);
       suppressTimer = null;
-    }, 600);
+    }
   }
 
   function axisName() {
@@ -68,6 +78,17 @@
       get editing() { return edit; },
       on: function (type, handler) {
         var off = bus.on(type, handler);
+        cleanups.push(off);
+        return off;
+      },
+      // ctx.on only reaches the internal bus; DOM listeners have to be
+      // registered here so unmount can remove them. Returns the same
+      // disposer that unmount runs, so a listener can also be removed early.
+      listen: function (target, type, handler, options) {
+        target.addEventListener(type, handler, options);
+        var off = function () {
+          target.removeEventListener(type, handler, options);
+        };
         cleanups.push(off);
         return off;
       },
@@ -191,6 +212,24 @@
     if (selected === id) selected = null;
   }
 
+  /* The observer only reports a size when the browser produces a frame, so a
+     card mounted while the WebView is backgrounded — or on a firmware without
+     ResizeObserver at all — would keep the 120px fallback from board.css and
+     size every glyph inside it against a cell it does not have. clientWidth is
+     the content box here: .card has a border and no padding, so it matches the
+     contentRect the observer writes. */
+  function measureCards() {
+    var measured = Object.keys(cards).map(function (id) {
+      var card = cards[id].card;
+      return { card: card, w: card.clientWidth, h: card.clientHeight };
+    });
+    measured.forEach(function (size) {
+      if (!size.w || !size.h) return;
+      size.card.style.setProperty('--cw', size.w.toFixed(1) + 'px');
+      size.card.style.setProperty('--ch', size.h.toFixed(1) + 'px');
+    });
+  }
+
   function render() {
     if (!boardEl || !settings.isReady()) return;
     var state = settings.get();
@@ -220,6 +259,7 @@
     });
 
     if (selected && !cards[selected]) selected = null;
+    measureCards();
     boardEl.classList.toggle('is-editing', edit);
     boardEl.classList.toggle('is-empty', active.length === 0);
     shell.setEditing(edit);
@@ -341,12 +381,17 @@
   }
 
   function armLongPress(cardEl, event) {
+    // A second finger on another card must fully retire the first arm: its
+    // document listeners would otherwise linger until any pointerup, and the
+    // new arm would fire with coordinates from the first hand.
+    if (longPressCancel) longPressCancel();
     var id = cardEl.dataset.widget;
     var startX = event.clientX;
     var startY = event.clientY;
     var pointerId = event.pointerId;
 
     function cancel() {
+      longPressCancel = null;
       clearLongPress();
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
@@ -366,8 +411,10 @@
     document.addEventListener('pointerup', onUp);
     document.addEventListener('pointercancel', onUp);
 
+    longPressCancel = cancel;
     clearLongPress();
     longPressTimer = setTimeout(function () {
+      longPressCancel = null;
       longPressTimer = null;
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
@@ -396,7 +443,6 @@
     selected = id;
     setEditClasses();
     updateToolbar();
-    suppressNextClick();
 
     var measure = metrics();
     // entry.item only mirrors w/h for ctx.size; the committed cell position
@@ -427,7 +473,6 @@
     selected = id;
     setEditClasses();
     updateToolbar();
-    suppressNextClick();
 
     var measure = metrics();
     var item = layoutNow().items[id];
@@ -494,6 +539,7 @@
     removeGhost();
     current.card.classList.remove('is-dragging');
     current.card.style.transform = '';
+    suppressGestureClick();
     var axis = current.measure.axis;
 
     if (!cancelled && current.moved) {
@@ -521,6 +567,7 @@
   }
 
   function onPointerDown(event) {
+    clearGestureClick();
     if (event.button !== undefined && event.button !== 0) return;
     if (shell.isModalOpen()) return;
     if (gesture) return;

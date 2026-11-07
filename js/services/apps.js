@@ -37,7 +37,14 @@
   function demand(on) {
     demandCount += on ? 1 : -1;
     if (demandCount < 0) demandCount = 0;
-    if (demandCount > 0) load(false);
+    if (demandCount > 0) {
+      // Deferred by a tick: a synchronous getUserApps with base64 icon
+      // decoding inside board.render() delayed the first paint on units with
+      // many installed apps.
+      setTimeout(function () {
+        if (demandCount > 0) load(false);
+      }, 0);
+    }
   }
 
   function launch(pkg) {

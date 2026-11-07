@@ -1,16 +1,17 @@
-/* Seats: user-picked heat, ventilation and driver memory controls. */
+/* Seats: user-picked heat, ventilation and driver memory controls, plus
+   glass/rear-window/steering-wheel heater toggles. */
 
 (function (root) {
   'use strict';
 
   var def = {
     id: 'seats',
-    title: 'Сиденья',
-    description: 'Подогрев, вентиляция и память сидений',
+    title: 'Сиденья и обогрев',
+    description: 'Подогрев, вентиляция сидений, обогрев стёкол и руля',
     order: 45,
     defaultSize: { landscape: { w: 2, h: 2 }, portrait: { w: 2, h: 2 } },
     minSize: { landscape: { w: 2, h: 1 }, portrait: { w: 2, h: 1 } },
-    settingsDefaults: { slots: [] },
+    settingsDefaults: { slots: [], rearMaxLevel: 3 },
     create: function (ctx) {
       var App = root.App;
       var dom = App.ui.dom;
@@ -19,13 +20,13 @@
       var tiles = App.core.tiles;
       var climate = ctx.services.climate;
       var car = ctx.services.car;
+      var bridge = App.core.bridge;
       var node = ctx.root;
 
       node.classList.add('w-seats');
       ctx.demand('climate', true);
       ctx.demand('car', true);
 
-      var LEVELS = catalog.maxLevel;
       var PENDING_TTL = 5000;
       var pending = {};
 
@@ -42,13 +43,15 @@
 
       function settingsKey() {
         return slots.list(ctx.settings && ctx.settings.slots).join('|') +
+          '|' + catalog.getRearMaxLevel(ctx.settings) +
           '|' + ctx.size.w + 'x' + ctx.size.h;
       }
 
       var lastKey = settingsKey();
 
       function pendingKey(item) {
-        if (item.seat.source === 'climate') {
+        if (item.heater) return item.key;
+        if (item.seat && item.seat.source === 'climate') {
           return item.seat.state + (item.kind === 'vent' ? 'SeatVent' : 'SeatHeat');
         }
         return item.id;
@@ -59,7 +62,7 @@
       function levelFor(item) {
         if (item.kind === 'memory') return null;
         var actual = catalog.level(item, climate.state(), car.state());
-        if (item.seat.source === 'climate') return actual;
+        if (item.heater || (item.seat && item.seat.source === 'climate')) return actual;
         var entry = pending[item.id];
         if (!entry) return actual;
         if (actual === entry.level || Date.now() - entry.at > PENDING_TTL) {
@@ -70,7 +73,8 @@
       }
 
       function isPending(item, climateState) {
-        if (item.seat.source === 'climate') return !!climateState.pending[pendingKey(item)];
+        if (item.heater) return !!climateState.pending[item.key];
+        if (item.seat && item.seat.source === 'climate') return !!climateState.pending[pendingKey(item)];
         return !!pending[item.id];
       }
 
@@ -83,11 +87,22 @@
         return { cols: count <= 4 ? 2 : Math.ceil(count / 2), rows: 2 };
       }
 
-      function meter(level) {
+      function getLevelsFor(item) {
+        if (item.heater) return 1; // heater is on/off, single indicator
+        if (item.seat && item.seat.source === 'enum') {
+          return catalog.getRearMaxLevel(ctx.settings);
+        }
+        return 3; // front seats always 3 levels
+      }
+
+      function meter(item, level) {
         var wrap = dom.create('span', 'seat-btn-levels');
         wrap.setAttribute('aria-hidden', 'true');
         var value = typeof level === 'number' ? level : 0;
-        for (var step = 1; step <= LEVELS; step += 1) {
+        var levels = getLevelsFor(item);
+        // The gauge fills from the bottom, so the first child is the top segment
+        // and the lit steps stack upward from the last one.
+        for (var step = levels; step >= 1; step -= 1) {
           wrap.appendChild(dom.create('i', step <= value ? 'is-on' : ''));
         }
         return wrap;
@@ -100,14 +115,20 @@
         button.type = 'button';
         button.dataset.item = item.id;
         button.disabled = disabled;
+        var levels = getLevelsFor(item);
         if (item.kind === 'memory') {
           button.classList.add('seat-btn--memory');
           button.setAttribute('aria-label', item.title + ', применить');
         } else {
           var value = typeof level === 'number' ? level : 0;
           button.setAttribute('aria-pressed', value > 0 ? 'true' : 'false');
-          button.setAttribute('aria-label', item.title + ': уровень ' + value +
-            (value >= LEVELS ? ', выключить' : ', повысить'));
+          if (item.heater) {
+            button.setAttribute('aria-label', item.title + ': ' +
+              (value > 0 ? 'включён, выключить' : 'выключен, включить'));
+          } else {
+            button.setAttribute('aria-label', item.title + ': уровень ' + value +
+              (value >= levels ? ', выключить' : ', повысить'));
+          }
         }
 
         if (item.kind === 'memory') {
@@ -116,18 +137,32 @@
           button.appendChild(glyph);
         } else {
           var icon = dom.create('span',
-            'seat-btn-icon seat-btn-icon--' + item.kind + ' seat-btn-icon--' + item.seat.side);
+            'seat-btn-icon seat-btn-icon--' + item.kind +
+            (item.heater ? ' seat-btn-icon--heater seat-btn-icon--' + item.icon : ' seat-btn-icon--' + item.seat.side));
           icon.setAttribute('aria-hidden', 'true');
           button.appendChild(icon);
         }
 
         var text = dom.create('span', 'seat-btn-text');
-        text.appendChild(dom.create('span', 'seat-btn-label', item.seat.title));
-        text.appendChild(dom.create('span', 'seat-btn-kind', item.kindTitle));
+        text.appendChild(dom.create('span', 'seat-btn-label', item.seat ? item.seat.title : item.title));
+        if (!item.heater) {
+          text.appendChild(dom.create('span', 'seat-btn-kind', item.kindTitle));
+        }
         button.appendChild(text);
-        if (item.kind !== 'memory') button.appendChild(meter(level));
+        if (item.kind !== 'memory') {
+          var meterEl = meter(item, level);
+          // Set the CSS variable for dynamic levels
+          meterEl.style.setProperty('--seat-levels', String(levels));
+          button.appendChild(meterEl);
+        }
         return button;
       }
+
+      // Poll events arrive every few seconds while driving, and a dom.clear()
+      // between pointerdown and pointerup swallows the tap — the button dies
+      // before the click fires. The card is only rebuilt when something it
+      // shows has actually changed.
+      var shownKey = '';
 
       function build() {
         var size = ctx.size;
@@ -137,6 +172,18 @@
           .filter(function (item) { return !!item; });
         var capacity = Math.max(1, tiles.capacity(size, slots.MAX, 2));
         var visible = items.slice(0, Math.max(1, capacity));
+
+        var rows = visible.map(function (item) {
+          return { item: item, level: levelFor(item), pending: isPending(item, climateState) };
+        });
+        var key = [settingsKey(), climateState.available, carState.available]
+          .concat(rows.map(function (row) {
+            return row.item.id + ':' + (row.level === null ? 'x' : row.level) +
+              (row.pending ? 'p' : '');
+          }))
+          .join('|');
+        if (key === shownKey) return;
+        shownKey = key;
 
         dom.clear(node);
         node.classList.toggle('is-unavailable', !climateState.available && !carState.available);
@@ -149,13 +196,21 @@
         var gridSpec = matrix(visible.length, size);
         node.style.setProperty('--seat-cols', String(gridSpec.cols));
         node.style.setProperty('--seat-rows', String(gridSpec.rows));
+        // A cell's share of the card is 1/cols. The inline row of a one-row tile
+        // has to fit its caption inside that share, so the type guard is written
+        // as a factor rather than dividing by a variable, which older WebViews
+        // resolve to an invalid declaration.
+        node.style.setProperty('--seat-cell', String(1 / gridSpec.cols));
 
         var grid = dom.create('div', 'seats-grid');
-        visible.forEach(function (item) {
-          var disabled = item.seat.source === 'climate'
+        rows.forEach(function (row) {
+          var item = row.item;
+          var disabled = item.heater
             ? !climateState.available
-            : !carState.available;
-          grid.appendChild(control(item, levelFor(item), disabled, isPending(item, climateState)));
+            : (item.seat && item.seat.source === 'climate')
+              ? !climateState.available
+              : !carState.available;
+          grid.appendChild(control(item, row.level, disabled, row.pending));
         });
         node.appendChild(grid);
 
@@ -171,15 +226,22 @@
         if (!item) return;
 
         if (item.kind === 'memory') {
-          var applied = car.runEnum(catalog.enumName(item, 0));
+          var applied = car.runEnum(catalog.enumName(item, 0, ctx.settings));
           if (applied.ok) ctx.toast(item.kindTitle + ': команда отправлена');
           else ctx.toast('Автомобиль не принял команду', 'warn');
           return;
         }
 
+        if (item.heater) {
+          // Heater toggle (glass, rear window, steering wheel) — on/off via climate
+          climate.toggle(item.key);
+          return;
+        }
+
         var current = levelFor(item);
-        var next = typeof current === 'number' && current >= LEVELS ? 0 : (current || 0) + 1;
-        if (item.seat.source === 'climate') {
+        var levels = item.seat && item.seat.source === 'enum' ? catalog.getRearMaxLevel(ctx.settings) : 3;
+        var next = typeof current === 'number' && current >= levels ? 0 : (current || 0) + 1;
+        if (item.seat && item.seat.source === 'climate') {
           var sent = item.kind === 'heat'
             ? climate.setSeatHeat(item.seat.seat, next)
             : climate.setSeatVent(item.seat.seat, next);
@@ -187,16 +249,33 @@
           return;
         }
 
-        var result = car.runEnum(catalog.enumName(item, next));
-        if (!result.ok) {
-          ctx.toast('Автомобиль не принял команду', 'warn');
-          return;
-        }
-        pending[item.id] = { level: next, at: Date.now() };
-        // The TTL is checked on render; without a repaint the pending look
-        // would stay until the next car event, which may never come.
-        ctx.later(PENDING_TTL + 100, build);
-        build();
+        // Use async enum for rear seats with proper error handling. Firmwares
+        // without requestRunEnumAsync fall back to the synchronous runEnum —
+        // the same commands the driver-memory buttons use.
+        var requestId = 'seat-enum-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        var enumNameStr = catalog.enumName(item, next, ctx.settings);
+        var acceptPending = function () {
+          pending[item.id] = { level: next, at: Date.now() };
+          // A quick re-read confirms the tap in under a second instead of
+          // waiting for the next poll. A plain timer on purpose: the read is
+          // the service's concern, a remount of the card must not cancel it —
+          // same pattern as car.runEnum().
+          setTimeout(function () { car.refresh(); }, 700);
+          ctx.later(PENDING_TTL + 100, build);
+          build();
+        };
+        bridge.runEnumAsyncPromise(requestId, enumNameStr).then(acceptPending).catch(function (err) {
+          if (err && err.error === 'unavailable') {
+            var sent = car.runEnum(enumNameStr);
+            if (sent.ok) {
+              acceptPending();
+              return;
+            }
+            ctx.toast('Автомобиль не принял команду: ' + (sent.error || 'unknown'), 'warn');
+            return;
+          }
+          ctx.toast('Автомобиль не принял команду: ' + (err.error || 'unknown'), 'warn');
+        });
       });
 
       ctx.on('climate:change', build);

@@ -58,6 +58,7 @@
     run('weather', function () { App.services.weather.init(); });
     run('apps', function () { App.services.apps.init(); });
     run('nav', function () { App.services.nav.init(); });
+    run('body', function () { App.services.body.init(); });
 
     // The host starts sending events after onJsReady, and mounting a widget may
     // already call into the host (the nav card subscribes to the mini-map).

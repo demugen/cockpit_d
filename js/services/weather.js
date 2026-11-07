@@ -55,7 +55,7 @@
     return apply(raw);
   }
 
-  function refresh(manual) {
+  function refresh() {
     if (!bridge.isNative()) {
       state.error = 'no_bridge';
       state.loading = false;
@@ -102,7 +102,7 @@
   function start() {
     stop();
     if (demandCount <= 0 || document.hidden) return;
-    timer = setInterval(function () { refresh(false); }, intervalMs());
+    timer = setInterval(function () { refresh(); }, intervalMs());
   }
 
   function demand(on) {
@@ -110,7 +110,7 @@
     if (demandCount < 0) demandCount = 0;
     if (demandCount > 0) {
       loadSaved();
-      refresh(false);
+      refresh();
       start();
     } else {
       stop();

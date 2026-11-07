@@ -191,6 +191,18 @@
     climate[key] = !!value;
   }
 
+  // The getters report heat/vent one scale higher than the commands: an idle
+  // seat reads 1 (or 0), level N reads N + 1. The panel's car.js normalizes
+  // this back, so the stub has to emit the same raw values as the real host —
+  // feeding command levels directly made the rear gauges show a phantom level.
+  function seatGetter(record) {
+    return {
+      seat: record.seat,
+      heat: record.heat > 0 ? record.heat + 1 : 0,
+      vent: record.vent > 0 ? record.vent + 1 : 0
+    };
+  }
+
   function carData(name) {
     if (name === 'all' || name === 'state' || name === 'car' || name === 'carState' || name === 'car_state') {
       return JSON.stringify({
@@ -218,8 +230,16 @@
         },
         seats: {
           name: 'seats',
-          front: { name: 'frontSeats', frontLeft: car.seats.frontLeft, frontRight: car.seats.frontRight },
-          rear: { name: 'rearSeats', rearLeft: car.seats.rearLeft, rearRight: car.seats.rearRight }
+          front: {
+            name: 'frontSeats',
+            frontLeft: seatGetter(car.seats.frontLeft),
+            frontRight: seatGetter(car.seats.frontRight)
+          },
+          rear: {
+            name: 'rearSeats',
+            rearLeft: seatGetter(car.seats.rearLeft),
+            rearRight: seatGetter(car.seats.rearRight)
+          }
         }
       });
     }
@@ -356,11 +376,84 @@
     }
   }
 
+  // The glass: positions are only readable through get_windows_state, so a
+  // command answers "sent" and the numbers move on the next read.
+  var WINDOW_ORDER = ['front_left', 'front_right', 'rear_left', 'rear_right'];
+  var windowPositions = [0, 0, 0, 0];
+  var WINDOW_FULL = /^open_window_(front_left|front_right|rear_left|rear_right)_full$/;
+  var WINDOW_CLOSE = /^close_window_(front_left|front_right|rear_left|rear_right)$/;
+  var WINDOW_STEP = /^open_window_(front_left|front_right|rear_left|rear_right)_10$/;
+
+  function windowIndex(name) {
+    return WINDOW_ORDER.indexOf(name);
+  }
+
+  function windowObject(index) {
+    var percent = windowPositions[index];
+    return {
+      window: index,
+      name: WINDOW_ORDER[index],
+      available: true,
+      state: percent <= 0 ? 'closed' : (percent >= 100 ? 'open' : 'partial'),
+      rawState: percent <= 0 ? 0 : 1,
+      rawPosition: percent * 10,
+      openPercent: percent
+    };
+  }
+
+  function setWindows(indexes, percent) {
+    indexes.forEach(function (index) {
+      windowPositions[index] = clamp(Math.round(percent), 0, 100);
+    });
+  }
+
+  function handleWindowCommand(cmd, data) {
+    var match;
+    if (cmd === 'get_windows_state' || cmd === 'getWindowsState') {
+      return ok(cmd, {
+        available: true,
+        windows: WINDOW_ORDER.map(function (name, index) { return windowObject(index); })
+      });
+    }
+    if (cmd === 'get_window_state' || cmd === 'getWindowState') {
+      var single = windowObject(clamp(Math.round(Number(data.window) || 0), 0, 3));
+      delete single.window;
+      delete single.name;
+      return ok(cmd, single);
+    }
+    var all = [0, 1, 2, 3];
+    if (cmd === 'open_windows_full') {
+      setWindows(all, 100);
+      return ok(cmd);
+    }
+    if (cmd === 'close_windows') {
+      setWindows(all, 0);
+      return ok(cmd);
+    }
+    if (cmd === 'open_windows_10') {
+      setWindows(all, 10);
+      return ok(cmd);
+    }
+    // Dropped from the J profile: the route still answers, always with failure.
+    if (cmd === 'open_windows_50') return fail(cmd, 'unsupported');
+    match = WINDOW_FULL.exec(cmd);
+    if (match) {
+      setWindows([windowIndex(match[1])], 100);
+      return ok(cmd);
+    }
+    match = WINDOW_CLOSE.exec(cmd);
+    if (match) {
+      setWindows([windowIndex(match[1])], 0);
+      return ok(cmd);
+    }
+    // Accepted, and the glass does not move — the open defect the host
+    // documentation describes.
+    if (WINDOW_STEP.exec(cmd)) return ok(cmd);
+    return null;
+  }
+
   var BODY_COMMANDS = [
-    'open_trunk', 'close_trunk', 'open_windows_full', 'open_windows_10', 'open_windows_50',
-    'close_windows', 'open_window_front_left_full', 'open_window_front_right_full',
-    'open_window_rear_left_full', 'open_window_rear_right_full', 'open_window_front_left_10',
-    'open_window_front_right_10', 'open_window_rear_left_10', 'open_window_rear_right_10',
+    'open_trunk', 'close_trunk',
     'parking_sensors_on', 'disable_qnx_vignette', 'enable_qnx_vignette'
   ];
 
@@ -372,6 +465,8 @@
     if (climateResult) return climateResult;
     var modeResult = handleModeCommand(cmd, data);
     if (modeResult) return modeResult;
+    var windowResult = handleWindowCommand(cmd, data);
+    if (windowResult) return windowResult;
     if (BODY_COMMANDS.indexOf(cmd) !== -1) return ok(cmd);
     return fail(cmd, 'Unknown command');
   }
@@ -600,11 +695,27 @@
       }, 60);
       return true;
     },
+    requestCarDataAsyncPromise: function (token, requestId, name) {
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          emit('carResponse', { requestId: requestId, requestType: 'data', response: JSON.parse(carData(name)) });
+          resolve({ ok: true });
+        }, 60);
+      });
+    },
     requestCarCommandAsync: function (token, requestId, payload) {
       setTimeout(function () {
         emit('carResponse', { requestId: requestId, requestType: 'command', response: JSON.parse(carCommand(payload)) });
       }, 60);
       return true;
+    },
+    requestCarCommandAsyncPromise: function (token, requestId, payload) {
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          emit('carResponse', { requestId: requestId, requestType: 'command', response: JSON.parse(carCommand(payload)) });
+          resolve({ ok: true });
+        }, 60);
+      });
     },
     requestRunAppAsync: function (token, requestId, pkg) {
       var result = JSON.parse(window.androidApi.runApp(token, pkg));
@@ -619,6 +730,15 @@
         emit('carResponse', { requestId: requestId, requestType: 'runEnum', response: result });
       }, 60);
       return true;
+    },
+    requestRunEnumAsyncPromise: function (token, requestId, name) {
+      var result = JSON.parse(runEnum(name));
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          emit('carResponse', { requestId: requestId, requestType: 'runEnum', response: result });
+          resolve({ ok: true });
+        }, 60);
+      });
     },
     requestLauncherCatalogAsync: function (token, requestId) {
       setTimeout(function () { launcherCatalog(requestId); }, 80);

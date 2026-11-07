@@ -41,7 +41,7 @@
       function refresh(event) {
         if (event) event.stopPropagation();
         if (ctx.editing) return;
-        service.refresh(true);
+        service.refresh();
       }
 
       function build() {

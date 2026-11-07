@@ -1,6 +1,7 @@
-/* Body commands: windows only. The host answers with a bare success and has no
-   getter for the glass position, so this service reports "sent" and never
-   claims the car actually moved. */
+/* Body commands: windows. Moving the glass is fire-and-forget — the host answers
+   a request with a bare success and the real position only comes from
+   get_windows_state — so this service keeps the two apart: a command result
+   says "sent", only the readout says "open". */
 
 (function (App) {
   'use strict';
@@ -8,38 +9,36 @@
   var bus = App.core.bus;
   var bridge = App.core.bridge;
 
+  // Index order is the one the host documents for get_windows_state.
+  var WINDOW_INDEX = ['front_left', 'front_right', 'rear_left', 'rear_right'];
+
   var GROUPS = [
     {
       id: 'windows',
       label: 'Все окна',
       actions: [
-        { id: 'win-10', cmd: 'open_windows_10', label: '+10%', title: 'Приоткрыть все окна', done: 'Отправлено: окна на 10%' },
-        { id: 'win-50', cmd: 'open_windows_50', label: '+50%', title: 'Открыть все окна наполовину', done: 'Отправлено: окна на 50%' },
-        { id: 'win-all', cmd: 'open_windows_full', label: 'Открыть', title: 'Открыть все окна полностью', confirm: true, done: 'Отправлено: открыть все окна' },
-        { id: 'win-close', cmd: 'close_windows', label: 'Закрыть', title: 'Закрыть все окна', done: 'Отправлено: закрыть окна' }
+        { id: 'win-close', cmd: 'close_windows', label: 'Закрыть', title: 'Закрыть все окна', done: 'Отправлено: закрыть окна' },
+        // The profile has no percentage for the glass: this is the factory
+        // ventilation mode, and the old `*_10` name only survived for
+        // compatibility.
+        { id: 'win-vent', cmd: 'open_windows_10', label: 'Проветрить', title: 'Штатное проветривание: все окна приоткрыты', done: 'Отправлено: проветривание' },
+        { id: 'win-all', cmd: 'open_windows_full', label: 'Открыть', title: 'Открыть все окна полностью', confirm: true, done: 'Отправлено: открыть все окна' }
       ]
     },
     {
       id: 'corners',
       label: 'Каждое окно',
-      hint: 'Удержание — открыть полностью',
+      hint: 'Касание — закрыть, удержание — открыть',
       actions: [
-        { id: 'win-fl', cmd: 'open_window_front_left_10', label: 'Лев. перед.', title: 'Левое переднее окно', full: true, done: 'Отправлено: приоткрыть левое переднее' },
-        { id: 'win-fr', cmd: 'open_window_front_right_10', label: 'Прав. перед.', title: 'Правое переднее окно', full: true, done: 'Отправлено: приоткрыть правое переднее' },
-        { id: 'win-rl', cmd: 'open_window_rear_left_10', label: 'Лев. зад.', title: 'Левое заднее окно', full: true, done: 'Отправлено: приоткрыть левое заднее' },
-        { id: 'win-rr', cmd: 'open_window_rear_right_10', label: 'Прав. зад.', title: 'Правое заднее окно', full: true, done: 'Отправлено: приоткрыть правое заднее' }
+        // Four corners share two short labels otherwise ("Спереди" twice), and
+        // the driver cannot tell which glass a button closes.
+        { id: 'win-fl', window: 0, cmd: 'close_window_front_left', open: 'open_window_front_left_full', label: 'ЛП', title: 'Левое переднее окно', full: true, done: 'Отправлено: закрыть левое переднее', openDone: 'Отправлено: левое переднее полностью' },
+        { id: 'win-fr', window: 1, cmd: 'close_window_front_right', open: 'open_window_front_right_full', label: 'ПП', title: 'Правое переднее окно', full: true, done: 'Отправлено: закрыть правое переднее', openDone: 'Отправлено: правое переднее полностью' },
+        { id: 'win-rl', window: 2, cmd: 'close_window_rear_left', open: 'open_window_rear_left_full', label: 'ЛЗ', title: 'Левое заднее окно', full: true, done: 'Отправлено: закрыть левое заднее', openDone: 'Отправлено: левое заднее полностью' },
+        { id: 'win-rr', window: 3, cmd: 'close_window_rear_right', open: 'open_window_rear_right_full', label: 'ПЗ', title: 'Правое заднее окно', full: true, done: 'Отправлено: закрыть правое заднее', openDone: 'Отправлено: правое заднее полностью' }
       ]
     }
   ];
-
-  // The profile has no per-window close: a corner can only be opened 10% or
-  // fully, closing is available for all windows at once.
-  var CORNER_FULL = {
-    'win-fl': { cmd: 'open_window_front_left_full', done: 'Отправлено: левое переднее полностью' },
-    'win-fr': { cmd: 'open_window_front_right_full', done: 'Отправлено: правое переднее полностью' },
-    'win-rl': { cmd: 'open_window_rear_left_full', done: 'Отправлено: левое заднее полностью' },
-    'win-rr': { cmd: 'open_window_rear_right_full', done: 'Отправлено: правое заднее полностью' }
-  };
 
   var byId = Object.create(null);
   GROUPS.forEach(function (group) {
@@ -80,13 +79,15 @@
     bus.emit('body:result', { id: id, ok: ok, text: text });
   }
 
-  // `full` picks the fully-open command for a single-corner button.
-  function run(id, full) {
+  // `open` picks the fully-open command for a corner button held down. The
+  // one-step `open_window_*_10` requests are left out on purpose: the host
+  // accepts them and then the glass does not move.
+  function run(id, open) {
     var action = byId[id];
     if (!action) return false;
-    var extra = full && CORNER_FULL[id];
-    var command = extra ? extra.cmd : action.cmd;
-    var done = extra ? extra.done : action.done;
+    var command = open ? action.open : action.cmd;
+    if (!command) return false;
+    var done = open ? action.openDone : action.done;
     if (!bridge.has('carCommand')) {
       publish(id, false, 'Нет связи с автомобилем');
       return false;
@@ -94,6 +95,8 @@
     var response = bridge.command({ cmd: command });
     var ok = !!response && response.success !== false;
     publish(id, ok, ok ? done : errorText(response));
+    // The position arrives on its own getter a moment after the request.
+    if (ok) setTimeout(read, 900);
     return ok;
   }
 
@@ -102,10 +105,106 @@
     return !!(action && action.confirm);
   }
 
+  /* The readout. `windows[i]` is null while the host gives no number for that
+     corner; state carries the closed/open/partial answer, which firmwares
+     report even when the position scale is unknown. */
+  var windows = [null, null, null, null];
+  var positions = [null, null, null, null];
+  var reported = false;
+  var demandCount = 0;
+  var timer = null;
+
+  function percentOf(item) {
+    var value = item && item.openPercent;
+    if (value === null || value === undefined || !isFinite(Number(value))) return null;
+    return Math.max(0, Math.min(100, Math.round(Number(value))));
+  }
+
+  function stateOf(item) {
+    var known = ['closed', 'open', 'partial', 'tilted'];
+    var value = item && item.state;
+    return known.indexOf(value) !== -1 ? value : null;
+  }
+
+  function applyWindows(items) {
+    var changed = false;
+    WINDOW_INDEX.forEach(function (name, index) {
+      var match = null;
+      items.forEach(function (item) {
+        if (item && (item.name === name || Number(item.window) === index)) match = item;
+      });
+      var usable = match && match.available !== false;
+      var nextPercent = usable ? percentOf(match) : null;
+      var nextState = usable ? stateOf(match) : null;
+      if (nextPercent !== positions[index] || nextState !== windows[index]) changed = true;
+      positions[index] = nextPercent;
+      windows[index] = nextState;
+      if (nextPercent !== null || nextState !== null) reported = true;
+    });
+    if (changed) {
+      bus.emit('body:windows', {
+        windows: windows.slice(),
+        positions: positions.slice(),
+        reported: reported
+      });
+    }
+  }
+
+  function read() {
+    if (demandCount <= 0 || document.hidden) return;
+    var response = bridge.command({ cmd: 'get_windows_state' });
+    // `success: true` with `available: false` means the route ran and there is
+    // no glass data: that is a silent answer, not a set of closed windows.
+    if (!response || response.success === false || !Array.isArray(response.windows)) return;
+    applyWindows(response.windows);
+  }
+
+  function stop() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  function start() {
+    stop();
+    if (demandCount <= 0 || document.hidden) return;
+    timer = setInterval(read, 2000);
+  }
+
+  function demand(on) {
+    demandCount += on ? 1 : -1;
+    if (demandCount < 0) demandCount = 0;
+    if (demandCount > 0) {
+      read();
+      start();
+    } else {
+      stop();
+    }
+  }
+
+  function snapshot() {
+    return { windows: windows.slice(), positions: positions.slice(), reported: reported };
+  }
+
+  function init() {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop();
+      else {
+        start();
+        read();
+      }
+    });
+  }
+
   App.services.body = {
     groups: groups,
     get: get,
     run: run,
-    needsConfirm: needsConfirm
+    needsConfirm: needsConfirm,
+    init: init,
+    demand: demand,
+    read: read,
+    snapshot: snapshot
   };
 })(window.App);

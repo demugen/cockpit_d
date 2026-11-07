@@ -12,7 +12,11 @@
 
   --bg: #070a0f;
   --bg-soft: #0c1118;
-  --card: rgba(21, 27, 37, 0.94);
+  /* The widget panel is the only translucent surface: the shell writes
+     --card-alpha as theme base times (1 - transparency), so text, icons and
+     the wallpaper layers never share one fade. */
+  --card-rgb: 21, 27, 37;
+  --card: rgba(var(--card-rgb), var(--card-alpha, 0.94));
   --card-solid: #141a24;
   --control: rgba(255, 255, 255, 0.055);
   --control-hover: rgba(255, 255, 255, 0.11);
@@ -21,11 +25,12 @@
 
   --text: #edf2fa;
   --muted: #8b96a8;
-  --faint: #5d687a;
+  --faint: #7b879b;
 
   --accent: #3f9dff;
   --accent-bright: #7cc2ff;
-  --accent-ink: #ffffff;
+  /* Dark ink on the bright accent: white on #3f9dff is only 2.8:1. */
+  --accent-ink: #071322;
   --accent-soft: rgba(63, 157, 255, 0.16);
   --accent-border: rgba(63, 157, 255, 0.4);
   --good: #45d18d;
@@ -42,7 +47,8 @@
 
   --bg: #e8edf4;
   --bg-soft: #f4f7fb;
-  --card: rgba(255, 255, 255, 0.92);
+  --card-rgb: 255, 255, 255;
+  --card: rgba(var(--card-rgb), var(--card-alpha, 0.92));
   --card-solid: #ffffff;
   --control: rgba(17, 28, 43, 0.055);
   --control-hover: rgba(17, 28, 43, 0.11);
@@ -51,10 +57,12 @@
 
   --text: #111823;
   --muted: #5b6678;
-  --faint: #6d7889;
+  --faint: #667184;
 
   --accent: #1f74e0;
   --accent-bright: #4a9cf0;
+  /* The light accent is dark enough for white ink (4.5:1). */
+  --accent-ink: #ffffff;
   --accent-soft: rgba(31, 116, 224, 0.12);
   --accent-border: rgba(31, 116, 224, 0.38);
   --good: #15965c;

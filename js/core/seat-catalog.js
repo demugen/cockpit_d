@@ -23,13 +23,15 @@
 
   var KINDS = [
     { id: 'heat', title: 'Обогрев' },
-    { id: 'vent', title: 'Вентиляция' }
+    { id: 'vent', title: 'Вентиляция' },
+    { id: 'heater', title: 'Обогрев' }
   ];
 
   var ITEMS = [];
 
   SEATS.forEach(function (seat) {
     KINDS.forEach(function (kind) {
+      if (kind.id === 'heater') return;
       ITEMS.push({
         id: seat.id + '-' + kind.id,
         seat: seat,
@@ -40,6 +42,30 @@
         subtitle: seat.title + ', ' + kind.title.toLowerCase(),
         memory: 0
       });
+    });
+  });
+
+  // Additional heater controls (glass, rear window, steering wheel) — on/off toggles
+  // through climate commands, not seat levels.
+  var HEATERS = [
+    { id: 'front-glass-heat', title: 'Лобовое стекло', key: 'frontGlassHeat', icon: 'glass', kind: 'heater', subtitle: 'Обогрев лобового стекла' },
+    { id: 'rear-defrost', title: 'Заднее стекло', key: 'rearDefrost', icon: 'rear', kind: 'heater', subtitle: 'Обогрев заднего стекла' },
+    { id: 'steering-wheel-heat', title: 'Руль', key: 'steeringWheelHeat', icon: 'wheel', kind: 'heater', subtitle: 'Обогрев руля' }
+  ];
+
+  HEATERS.forEach(function (h) {
+    ITEMS.push({
+      id: h.id,
+      seat: null,
+      kind: h.kind,
+      kindTitle: h.title,
+      mask: 'heater-' + h.id,
+      title: h.title,
+      subtitle: h.subtitle,
+      key: h.key,
+      icon: h.icon,
+      heater: true,
+      memory: 0
     });
   });
 
@@ -56,7 +82,7 @@
     });
   });
 
-  var DEFAULTS = ['driver-heat', 'driver-vent', 'passenger-heat', 'passenger-vent'];
+  var DEFAULTS = ['driver-heat', 'driver-vent', 'passenger-heat', 'passenger-vent', 'front-glass-heat', 'rear-defrost', 'steering-wheel-heat'];
 
   function list() {
     return ITEMS.slice();
@@ -73,15 +99,48 @@
     return DEFAULTS.slice();
   }
 
-  function clampLevel(level) {
+  // Settings key for rear seat max levels (2 or 3)
+  var REAR_LEVELS_KEY = 'rearMaxLevel';
+
+  // Two shapes reach this function: the seats widget passes its own settings
+  // ({ rearMaxLevel }), while global-tree callers pass the whole settings
+  // object (settings.widgets.settings.seats). Both must read the same value —
+  // 2.4.15 only changed the caller, so the lookup kept missing and the widget
+  // always fell back to 3 levels.
+  function getRearMaxLevel(settings) {
+    if (settings) {
+      var val = settings[REAR_LEVELS_KEY];
+      if (val !== 2 && val !== 3 && settings.widgets &&
+        settings.widgets.settings && settings.widgets.settings.seats) {
+        val = settings.widgets.settings.seats[REAR_LEVELS_KEY];
+      }
+      if (val === 2 || val === 3) return val;
+    }
+    return 3; // default
+  }
+
+  function clampLevel(level, maxLevel) {
     var number = Math.round(Number(level));
-    return isFinite(number) ? Math.min(3, Math.max(0, number)) : 0;
+    var max = typeof maxLevel === 'number' && maxLevel > 0 ? maxLevel : 3;
+    return isFinite(number) ? Math.min(max, Math.max(0, number)) : 0;
+  }
+
+  function clampLevelWithSettings(level, settings) {
+    var number = Math.round(Number(level));
+    var max = getRearMaxLevel(settings);
+    return isFinite(number) ? Math.min(max, Math.max(0, number)) : 0;
   }
 
   // The host reads front seats through climate state and rear seats through
   // car data; memory presets are momentary and have no readable state.
   function level(item, climate, car) {
-    if (!item || item.kind === 'memory') return null;
+    if (!item) return null;
+    if (item.kind === 'memory') return null;
+    if (item.heater) {
+      // Heater toggle (glass, rear window, steering wheel) — on/off from climate state
+      var value = climate ? climate[item.key] : null;
+      return typeof value === 'boolean' ? (value ? 1 : 0) : null;
+    }
     if (item.seat.source === 'climate') {
       var key = item.seat.state + (item.kind === 'vent' ? 'SeatVent' : 'SeatHeat');
       var value = climate ? climate[key] : null;
@@ -92,11 +151,12 @@
     return typeof rear === 'number' ? rear : null;
   }
 
-  function enumName(item, levelValue) {
+  function enumName(item, levelValue, settings) {
     if (!item) return '';
     if (item.kind === 'memory') return 'voditel_seat_' + item.memory;
+    if (item.heater) return ''; // heaters use climate.toggle(), not runEnum
     if (!item.seat.code) return '';
-    var value = clampLevel(levelValue);
+    var value = clampLevelWithSettings(levelValue, settings);
     var prefix = (item.kind === 'heat' ? 'heat_zad_seat_' : 'vent_zad_seat_') + item.seat.code;
     // The right rear seat spells zero as `_off`; the left one uses `_0`.
     if (value === 0 && item.seat.code === 'r') return prefix + '_off';
@@ -109,6 +169,7 @@
     defaults: defaults,
     level: level,
     enumName: enumName,
-    maxLevel: 3
+    getRearMaxLevel: getRearMaxLevel,
+    REAR_LEVELS_KEY: REAR_LEVELS_KEY
   };
 });

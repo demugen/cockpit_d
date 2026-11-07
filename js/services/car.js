@@ -20,7 +20,6 @@
 
   var demandCount = 0;
   var timer = null;
-  var inFlight = false;
   var signature = '';
   var watched = [];
 
@@ -38,15 +37,29 @@
     return utils.clamp(result, -60, 80);
   }
 
+  // The seat number in the getter payload is an identifier (0, 1, 2), not a level.
   function level(value) {
     var result = utils.toNumber(value, null);
     if (result === null) return null;
     return utils.clamp(Math.round(result), 0, 4);
   }
 
+  // Heat/vent getters speak a different scale than the commands: 0 and 1 both
+  // read as "off", 2..4 are levels 1..3. The command scale (carCommand and
+  // runEnum tokens) is 0..3. Reading the getter raw made an idle rear heater
+  // light up its first segment. Same rule as StreletS27's normalizeLevel:
+  // r === 0 → 0, r 1..4 → r − 1, anything else → unknown.
+  function getterLevel(value) {
+    var result = utils.toNumber(value, null);
+    if (result === null) return null;
+    var rounded = Math.round(result);
+    if (rounded < 0 || rounded > 4) return null;
+    return rounded <= 1 ? 0 : rounded - 1;
+  }
+
   function seat(source) {
     if (!source || typeof source !== 'object') return null;
-    return { seat: level(source.seat), heat: level(source.heat), vent: level(source.vent) };
+    return { seat: level(source.seat), heat: getterLevel(source.heat), vent: getterLevel(source.vent) };
   }
 
   function apply(data) {
@@ -119,11 +132,10 @@
   }
 
   function refresh() {
-    if (inFlight) return;
-    inFlight = true;
+    // Synchronous read: the host's getCarData does not pend, so no in-flight
+    // guard is needed — the old `inFlight` flag here never observed anything.
     var data = bridge.getCarData('all');
     var extra = readExtra(watched);
-    inFlight = false;
     if (!data) {
       state.error = bridge.isNative() ? 'unavailable' : 'no_bridge';
       state.available = false;

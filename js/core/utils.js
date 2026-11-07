@@ -127,6 +127,26 @@
     return Math.round(clamp(share, 0, 100) / 100 * tankVolume(tank));
   }
 
+  // The bridge answers with host codes, and a toast that repeats
+  // `license_required` tells the driver nothing. Codes outside this table keep
+  // the caller's wording, so a service can stay specific where it matters.
+  var ERROR_TEXT = {
+    unavailable: 'ГУ не поддерживает эту команду',
+    unauthorized: 'ГУ не разрешил команду',
+    license_required: 'Функция доступна по лицензии JCarTools',
+    app_not_found: 'Приложение не найдено на ГУ',
+    rejected: 'ГУ не принял запрос',
+    failed: 'ГУ сообщил об ошибке',
+    invalid_json: 'ГУ прислал нечитаемый ответ',
+    invalid_response: 'ГУ прислал нечитаемый ответ',
+    unsupported: 'Команда недоступна на этом ГУ'
+  };
+
+  function errorText(code, fallback) {
+    var text = (code === undefined || code === null) ? undefined : ERROR_TEXT[String(code)];
+    return text || fallback || 'ГУ не принял команду';
+  }
+
   return {
     MONTHS: MONTHS,
     WEEKDAYS: WEEKDAYS,
@@ -147,6 +167,7 @@
     formatTemperature: formatTemperature,
     formatDistance: formatDistance,
     tankVolume: tankVolume,
-    fuelLiters: fuelLiters
+    fuelLiters: fuelLiters,
+    errorText: errorText
   };
 });

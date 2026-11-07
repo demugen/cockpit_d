@@ -353,8 +353,21 @@
 
     var mapped = {};
     var failed = [];
+    // An empty list means "nothing is on the board", not "everything is": the
+    // caller that has just switched the last card off must not re-fit as if every
+    // hidden footprint were visible again, because hidden cards are now allowed to
+    // share a cell with a visible one and a strict re-fit would refuse and fall
+    // back to packing every saved size down to its minimum.
+    var activeIds = opts.activeIds || null;
 
-    order.forEach(function (id) {
+    // A card the user switched off keeps its saved cell so that switching it back
+    // on puts it where it was, but it is not on the board and must not hold that
+    // cell against the cards that are. move and resize already ignore it, so the
+    // re-fit has to agree: otherwise growing a visible card over a hidden
+    // footprint reports success and then silently snaps back.
+    var hidden = order.filter(function (id) { return !isActive(id, activeIds); });
+
+    order.filter(function (id) { return isActive(id, activeIds); }).forEach(function (id) {
       var item = items[id];
       var min = (opts.minSizes && opts.minSizes[id]) || { w: 1, h: 1 };
       // A viewport change must not resize the cards the user sized: the
@@ -376,8 +389,29 @@
       mapped[id] = rect;
     });
 
+    hidden.forEach(function (id) {
+      var min = (opts.minSizes && opts.minSizes[id]) || { w: 1, h: 1 };
+      mapped[id] = keptRect(items[id], grid, min);
+    });
+
     if (failed.length) return { ok: false, reason: 'full', items: null, failed: failed };
     return { ok: true, grid: grid, items: mapped, order: order };
+  }
+
+  /* The cell a switched-off card comes back to: its own saved size, clamped into
+     the new board and never below the widget's minimum, because the minimum is how
+     many cells the widget needs to render at all — the CSS keys whole layout
+     branches off the tile height. */
+  function keptRect(item, grid, min) {
+    var floor = min || { w: 1, h: 1 };
+    var width = clamp(Math.round(item.w), Math.min(floor.w, grid.cols), grid.cols);
+    var height = clamp(Math.round(item.h), Math.min(floor.h, grid.rows), grid.rows);
+    return {
+      x: clamp(Math.round(item.x), 0, grid.cols - width),
+      y: clamp(Math.round(item.y), 0, grid.rows - height),
+      w: width,
+      h: height
+    };
   }
 
   return {
@@ -398,6 +432,7 @@
     packLayout: packLayout,
     placeBest: placeBest,
     remap: remap,
+    keptRect: keptRect,
     toList: toList
   };
 });
